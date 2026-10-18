@@ -1,0 +1,12 @@
+# Dependencies & Build artifacts
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Personal learning profile
+/devpost/learner-profile.md
+
+# Credentials & environment files
+.env
+.env.*
+!.env.example
