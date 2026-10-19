@@ -10,3 +10,10 @@ dist/
 .env
 .env.*
 !.env.example
+
+# Agent & local workflow configurations
+.agents/
+.claude/
+agent/
+skills-lock.json
+
