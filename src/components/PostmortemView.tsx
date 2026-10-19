@@ -11,6 +11,14 @@ interface PostmortemViewProps {
 export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
   const [copiedMd, setCopiedMd] = useState(false);
   const [copiedJira, setCopiedJira] = useState(false);
+  const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
+
+  const toggleCheck = (idx: number) => {
+    setCheckedItems((prev) => ({
+      ...prev,
+      [idx]: !prev[idx]
+    }));
+  };
 
   const handleCopyMd = async () => {
     try {
@@ -26,8 +34,9 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
     try {
       const title = incident.executiveSummary.title;
       let md = `### Incident Action Items: ${title}\n\n`;
-      incident.actionItems.forEach((item) => {
-        md += `- [ ] **[${item.priority}]** ${item.action} (Owner: ${item.owner})\n`;
+      incident.actionItems.forEach((item, idx) => {
+        const mark = checkedItems[idx] ? 'x' : ' ';
+        md += `- [${mark}] **[${item.priority}]** ${item.action} (Owner: ${item.owner})\n`;
       });
       await navigator.clipboard.writeText(md);
       setCopiedJira(true);
@@ -111,44 +120,79 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
                   Remediation Action Items ({incident.actionItems.length})
                 </h4>
                 <p className="text-[11px] text-slate-400">
-                  Pre-formatted checklist with owners and priority badges
+                  Interactive checklist with owners and priority badges
                 </p>
               </div>
             </div>
 
-            {/* Rendered Checklist Preview with styled dark checkboxes */}
+            {/* Rendered Checklist Preview with custom theme-compliant SVG toggle */}
             <div className="space-y-2">
-              {incident.actionItems.map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex items-start space-x-2.5 p-2 rounded-lg bg-slate-950/60 border border-slate-850 text-xs font-mono"
-                >
-                  <input
-                    type="checkbox"
-                    defaultChecked={false}
-                    className="w-4 h-4 rounded border-slate-700 bg-slate-800 text-cyan-500 focus:ring-0 focus:ring-offset-0 cursor-pointer accent-cyan-500 mt-0.5"
-                  />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-0.5">
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
-                          item.priority === 'P0'
-                            ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
-                            : item.priority === 'P1'
-                            ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                            : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+              {incident.actionItems.map((item, idx) => {
+                const isChecked = !!checkedItems[idx];
+
+                return (
+                  <div
+                    key={idx}
+                    onClick={() => toggleCheck(idx)}
+                    className={`flex items-start space-x-3 px-4 py-3.5 rounded-lg border text-xs font-mono transition-all cursor-pointer select-none ${
+                      isChecked
+                        ? 'bg-cyan-950/20 border-cyan-500/40'
+                        : 'bg-slate-950/60 border-slate-850 hover:border-slate-700/80 hover:bg-slate-950/90'
+                    }`}
+                  >
+                    {/* Replace Checkboxes with Theme-Compliant Custom Toggle */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleCheck(idx);
+                      }}
+                      className={`group flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 mt-0.5 ${
+                        isChecked
+                          ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400'
+                          : 'bg-slate-950/80 border-slate-700 text-transparent hover:border-slate-500 hover:bg-slate-900'
+                      }`}
+                    >
+                      {/* Small theme SVG check icon instead of browser visual */}
+                      <svg
+                        className={`h-3 w-3 transition-transform duration-150 ${
+                          isChecked ? 'scale-100' : 'scale-0'
+                        }`}
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                        strokeWidth="3.5"
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </button>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-1">
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            item.priority === 'P0'
+                              ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                              : item.priority === 'P1'
+                              ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                              : 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                          }`}
+                        >
+                          {item.priority}
+                        </span>
+                        <span className="text-[11px] text-slate-400">{item.owner}</span>
+                      </div>
+                      <p
+                        className={`text-xs font-sans leading-relaxed transition-colors ${
+                          isChecked ? 'text-slate-400 line-through' : 'text-slate-200'
                         }`}
                       >
-                        {item.priority}
-                      </span>
-                      <span className="text-[11px] text-slate-400">{item.owner}</span>
+                        {item.action}
+                      </p>
                     </div>
-                    <p className="text-slate-300 text-xs font-sans leading-relaxed">
-                      {item.action}
-                    </p>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
