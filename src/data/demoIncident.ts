@@ -268,7 +268,7 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       rawSnippet: "[09:15:10] @dave_oncall: Could we be under a Layer 7 DDoS flood targeting the orders endpoint?",
       timeLostMinutes: 15,
       details: "Security team misdiagnosed high connection queues as an external volumetric flood. Spent 15 minutes investigating WAF telemetry and challenging valid users while database deadlocks mounted. 15 minutes lost.",
-      sourceLineIndices: [4, 5, 6, 7, 8, 9, 10, 11]
+      sourceLineIndices: [4, 5, 6, 7, 8, 9]
     },
     {
       id: "evt-db-4",
@@ -279,7 +279,7 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       rawSnippet: "[09:25:30] @elena_db: Joining bridge. Looking directly at pg_stat_activity on order-db-primary.",
       timeLostMinutes: 0,
       details: "Telemetry definitively disproved external DDoS: origin CPU was 12% and network nominal.",
-      sourceLineIndices: [12, 13]
+      sourceLineIndices: [10, 11]
     },
     {
       id: "evt-db-5",
@@ -290,7 +290,7 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       rawSnippet: "[09:28:40] @elena_db: ROOT CAUSE FOUND: PID 89412 is running `ALTER TABLE orders ADD COLUMN fulfillment_notes...`",
       timeLostMinutes: 0,
       details: "Background inventory-sync deploy executed DDL migration during peak traffic without lock_timeout, blocking all concurrent transactions.",
-      sourceLineIndices: [14, 15, 16]
+      sourceLineIndices: [12, 13, 14, 15]
     },
     {
       id: "evt-db-6",
@@ -301,7 +301,7 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       rawSnippet: "[09:32:15] @elena_db: MITIGATION: Executing `SELECT pg_terminate_backend(89412);` to kill the blocking DDL statement immediately.",
       timeLostMinutes: 0,
       details: "Terminating PID 89412 released AccessExclusiveLock immediately. Backlog drained within 30 seconds.",
-      sourceLineIndices: [17, 18, 19, 20]
+      sourceLineIndices: [16, 17, 18, 19]
     },
     {
       id: "evt-db-7",
@@ -312,7 +312,7 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       rawSnippet: "[09:38:50] @datadog-bot: RECOVERY - API Gateway POST /v2/orders p99 latency dropped to 42ms",
       timeLostMinutes: 0,
       details: "Zero lost or corrupted orders; all queued transactions successfully committed. Bridge closed at 09:41 UTC. Total duration: 31 minutes.",
-      sourceLineIndices: [21, 22, 23]
+      sourceLineIndices: [20, 21, 22]
     }
   ],
   actionItems: [

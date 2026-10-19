@@ -60,12 +60,12 @@ Build mode: fast
   Commit: `Add configurable live LLM synthesis with seamless offline fallback`
 
 - [ ] **6. Honest analysis and verification**
-  Becomes usable: The system guarantees honest boundaries and verified grounding: Sample mode strictly analyzes only the 3 built-in sample incidents (with clear inline guidance for custom logs); live AI prompts for line numbers and verifies line existence + timestamp matching; UI displays a computed "N/M milestones traced to log lines" badge; and failed API calls surface specific diagnostics without silent canned data substitution.
+  Becomes usable: The system guarantees honest boundaries and verified grounding: Sample mode strictly analyzes only the 2 built-in sample incidents (with clear inline guidance for custom logs); live AI prompts for line numbers and verifies line existence + timestamp matching; UI displays a computed "N/M milestones traced to log lines" badge; and failed API calls surface specific diagnostics without silent canned data substitution.
   Why now: SRE trust requirement—reviewers and evaluators must be confident that milestones are rigorously grounded in the raw log and not hallucinated or quietly mocked.
   PRD ref: `prd.md > Features and Behavior > 5. Honest Analysis & Verifiable Traceability (Slice 6)`, `prd.md > Decision Log`
   Spec ref: `spec.md > Slice 6: Honest Analysis and Verification`, `spec.md > Decisions and Open Issues`
   Build:
-    - [ ] Sample mode boundary: When no API key is present, analyze ONLY the 3 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 3 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
+    - [ ] Sample mode boundary: When no API key is present, analyze ONLY the 2 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
     - [ ] Remove the generic offline synthesizer that invents events for arbitrary logs (superseding "Deterministic Offline Fallback").
     - [ ] Surface specific error diagnostics for live API failures (bad key, rate limit, network, invalid JSON) with zero silent fallback to canned data.
     - [ ] Live prompt numbers log lines and instructs the model to cite line numbers; add verify step checking that cited lines exist and milestone timestamp matches a cited line within 1 minute; compute false lead time lost and triage ratio deterministically from timestamps.

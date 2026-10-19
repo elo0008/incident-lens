@@ -197,9 +197,9 @@ incident-lens/
 
 ### 1. Sample Mode Bounding & Guardrails
 - When no API key is present (`settings.apiKey` is empty), the application operates in **Sample mode**.
-- Synthesis is permitted ONLY for the 3 built-in sample incidents (e.g. Flash Sale 504s, Database Deadlock, and the default demo).
+- Synthesis is permitted ONLY for the 2 built-in sample incidents (Flash Sale 504s and Database Deadlock).
 - Any custom or unrecognized log text triggers an immediate inline amber warning banner in the editor:
-  `"Sample mode only analyzes the 3 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."`
+  `"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."`
 - Execution halts immediately: no loading card is shown and no timeline is generated.
 
 ### 2. Removal of Generic Synthetic Offline Generator
@@ -257,3 +257,9 @@ incident-lens/
 
 - **Strict JSON Schema vs. Unstructured Parsing:** Using a typed JSON schema ensures the UI can reliably render the timeline nodes, compute the time-spent ratio, and isolate false leads deterministically.
 - **Line Highlighting Mapping:** `synthesisService.ts` correlates `rawSnippet` text back to the input textarea's line index, enabling interactive bidirectional cross-pane inspection.
+
+### Decision Log — Oct 19, 2026: Kafka Scenario Cut, 2 Samples Ship
+- **Context:** Earlier drafts planned three demo presets (including a proposed Kafka consumer lag scenario).
+- **Decision:** Cut the Kafka scenario and ship strictly 2 built-in sample incidents (`flash_sale` and `db_deadlock`).
+- **Reasoning:** Sizing down to two realistic, fully grounded scenarios guarantees 100% auditability and source line traceability without inflating maintenance surface.
+
