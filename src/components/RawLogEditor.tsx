@@ -29,13 +29,12 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
   const highlightedRef = useRef<HTMLDivElement | null>(null);
   const gutterRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
-  const inspectScrollRef = useRef<HTMLDivElement | null>(null);
 
   const lines = rawLog ? rawLog.split('\n') : [];
   const lineCount = lines.length;
   const charCount = rawLog.length;
 
-  // Auto-scroll to first highlighted line when selection changes
+  // Auto-scroll to first highlighted line in Inspect mode
   useEffect(() => {
     if (highlightedLineIndices.length > 0 && highlightedRef.current) {
       highlightedRef.current.scrollIntoView({
@@ -52,7 +51,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
     }
   }, [rawLog]);
 
-  // Synchronize textarea vertical scroll with gutter
+  // Synchronize textarea vertical scroll with gutter in Edit mode
   const handleTextareaScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     if (gutterRef.current) {
       gutterRef.current.scrollTop = e.currentTarget.scrollTop;
@@ -81,7 +80,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                   ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
                   : 'bg-slate-800/80 border-slate-700 text-slate-300 hover:text-slate-100'
               }`}
-              title={isEditing ? 'Switch to interactive highlighted line viewer' : 'Edit raw log text'}
+              title={isEditing ? 'Switch to unified highlighted line viewer' : 'Edit raw log text'}
             >
               {isEditing ? (
                 <>
@@ -146,21 +145,21 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
       {/* Editor Body */}
       <div className="flex-1 relative overflow-hidden bg-slate-950 font-mono text-xs flex">
         {isEditing || lines.length === 0 ? (
-          /* Editable Textarea Mode with Synchronized Gutter */
+          /* Editable Textarea Mode with synchronized gutter */
           <div className="flex w-full h-full overflow-hidden">
-            {/* Gutter Line Numbers - Scroll synchronized to textarea */}
+            {/* Gutter Line Numbers */}
             <div
               ref={gutterRef}
-              className="w-12 py-3 bg-slate-950/90 border-r border-slate-800/60 text-slate-600 select-none text-right pr-2 shrink-0 font-mono overflow-hidden"
+              className="w-12 py-3 bg-slate-950/90 border-r border-slate-800/60 text-slate-600 select-none text-right pr-3 shrink-0 font-mono overflow-hidden"
             >
               {lines.length > 0 ? (
                 lines.map((_, i) => (
-                  <div key={i} className="h-6 leading-6 text-right pr-1">
+                  <div key={i} className="h-6 leading-6">
                     {i + 1}
                   </div>
                 ))
               ) : (
-                <div className="h-6 leading-6 text-right pr-1">1</div>
+                <div className="h-6 leading-6">1</div>
               )}
             </div>
 
@@ -173,56 +172,40 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
               onScroll={handleTextareaScroll}
               disabled={status === 'loading'}
               placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr click "Load Demo Incident" in the header to load our 42-minute Flash Sale incident.`}
-              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-auto whitespace-pre selection:bg-cyan-500/30"
+              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto whitespace-pre selection:bg-cyan-500/30"
               spellCheck={false}
             />
           </div>
         ) : (
-          /* Interactive Line Viewer Mode - Single Scroll Container */
-          <div
-            ref={inspectScrollRef}
-            className="w-full h-full overflow-auto flex scroll-smooth"
-          >
-            {/* Gutter Column */}
-            <div className="w-12 py-3 bg-slate-950 border-r border-slate-800/60 text-slate-600 select-none text-right pr-2 shrink-0 font-mono sticky left-0 z-10">
-              {lines.map((_, i) => {
-                const isHighlighted = highlightedLineIndices.includes(i);
-                return (
-                  <div
-                    key={i}
-                    className={`h-6 leading-6 flex items-center justify-end pr-1 transition-colors ${
-                      isHighlighted
-                        ? 'text-cyan-300 font-bold bg-cyan-500/20 rounded-l'
-                        : 'text-slate-600'
+          /* Inspect View Mode: Single unified scroll container with inline rows */
+          <div className="w-full h-full overflow-y-auto py-3 bg-slate-950">
+            {lines.map((line, idx) => {
+              const isHighlighted = highlightedLineIndices.includes(idx);
+              const isFirstHighlighted = highlightedLineIndices[0] === idx;
+
+              return (
+                <div
+                  key={idx}
+                  ref={isFirstHighlighted ? highlightedRef : null}
+                  className={`flex items-start font-mono text-xs leading-6 px-1 transition-colors ${
+                    isHighlighted
+                      ? 'bg-cyan-950/40 border-l-2 border-cyan-400 text-cyan-200 font-medium'
+                      : 'text-slate-300 hover:bg-slate-900/40'
+                  }`}
+                >
+                  <span
+                    className={`w-12 shrink-0 select-none text-right pr-4 font-mono ${
+                      isHighlighted ? 'text-cyan-300 font-bold' : 'text-slate-600'
                     }`}
                   >
-                    {i + 1}
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Lines Column */}
-            <div className="flex-1 py-3 overflow-x-auto">
-              {lines.map((line, i) => {
-                const isHighlighted = highlightedLineIndices.includes(i);
-                const isFirstHighlighted = highlightedLineIndices[0] === i;
-
-                return (
-                  <div
-                    key={i}
-                    ref={isFirstHighlighted ? highlightedRef : null}
-                    className={`h-6 leading-6 px-3 transition-colors flex items-center ${
-                      isHighlighted
-                        ? 'bg-cyan-500/15 border-l-2 border-cyan-400 text-cyan-200 font-medium'
-                        : 'text-slate-300 hover:bg-slate-900/50'
-                    }`}
-                  >
-                    <span className="whitespace-pre">{line || ' '}</span>
-                  </div>
-                );
-              })}
-            </div>
+                    {idx + 1}
+                  </span>
+                  <span className="flex-1 whitespace-pre-wrap break-all">
+                    {line || ' '}
+                  </span>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
