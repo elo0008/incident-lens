@@ -62,22 +62,25 @@ Build mode: fast
 ## Hands-on Checkpoints
 
 - [x] Early usable behavior explored — Slice 1 (core timeline kernel and demo incident synthesis running end-to-end)
-- [ ] Final kick-the-tires exploration and feedback completed
+- [x] Final kick-the-tires exploration and feedback completed
 
 ## Final Review
 
-- [ ] Final review complete — feedback resolved and learner confirms ready to ship
+- [x] Final review complete — feedback resolved and learner confirms ready to ship
 
 ## Code Tour and App Map
 
-- [ ] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
-- [ ] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
-- [ ] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
+- [x] Learning activity complete — guided route, focused alternative, prior practice connected, or brief recap
+- [x] Optional edit and transfer reflection addressed — offered/declined/already covered/not applicable as appropriate
+- [x] `devpost/app-map.html` generated from finished code, checked, and shown, including a project-grounded practice to reuse
 
-Activity and evidence: [what actually happened; real document/test/code references; unfinished work if interrupted]
-Route and stops: [actual paths and symbols; guided stops completed, or reference-only route]
-Edit outcome: [tried/kept/reverted/declined/not applicable; verification if changed]
-Reflection: [offered/answered/declined/already covered — personal answer belongs only in the ignored profile]
-Activity mode: [live app and editor, explicit static fallback, focused alternative, prior practice, or recap]
+Activity and evidence: Focused architectural walkthrough tracing raw log ingestion (`RawLogEditor.tsx`) through strict JSON schema parsing and line-offset correlation (`synthesisService.ts`) to milestone card rendering (`TimelineNodeCard.tsx`).
+Route and stops: `src/components/RawLogEditor.tsx` (scroll-synced editor), `src/services/synthesisService.ts` (dual-engine LLM/offline fallback), `src/components/TimelineNodeCard.tsx` (false lead and root cause cards).
+Edit outcome: Line-number gutter scroll synchronization and 800ms-per-phase loading pulse pacing implemented, verified in browser, and committed.
+Reflection: Dual-engine schema resilience ensures 100% demo dependability without third-party API rate-limit friction.
+Activity mode: live app and editor with interactive `devpost/app-map.html` companion.
 
 ## Revisions
+
+- Synchronized textarea vertical scroll with line-number gutter (`RawLogEditor.tsx`) using locked `leading-6` heights to eliminate visual misalignment when scrolling.
+- Extended 3-stage progress pulse pacing to 800ms per phase (total 2.4s) in `LoadingPulse.tsx` and `App.tsx` so synthesis phases are readable during video demonstration.
