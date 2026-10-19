@@ -134,7 +134,7 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
                   <div
                     key={idx}
                     onClick={() => toggleCheck(idx)}
-                    className={`flex items-start space-x-3 px-4 py-3.5 rounded-lg border text-xs font-mono transition-all cursor-pointer select-none ${
+                    className={`flex items-center space-x-3 px-4 py-3.5 rounded-lg border text-xs font-mono transition-all cursor-pointer select-none ${
                       isChecked
                         ? 'bg-cyan-950/20 border-cyan-500/40'
                         : 'bg-slate-950/60 border-slate-850 hover:border-slate-700/80 hover:bg-slate-950/90'
@@ -147,7 +147,7 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
                         e.stopPropagation();
                         toggleCheck(idx);
                       }}
-                      className={`group flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 mt-0.5 ${
+                      className={`group flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-all duration-150 focus:outline-none focus:ring-1 focus:ring-cyan-500/50 ${
                         isChecked
                           ? 'bg-cyan-500/20 border-cyan-400 text-cyan-400'
                           : 'bg-slate-950/80 border-slate-700 text-transparent hover:border-slate-500 hover:bg-slate-900'
