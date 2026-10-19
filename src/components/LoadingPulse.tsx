@@ -39,8 +39,9 @@ export const LoadingPulse: React.FC<LoadingPulseProps> = () => {
   const [activeStage, setActiveStage] = useState<number>(1);
 
   useEffect(() => {
-    const timer1 = setTimeout(() => setActiveStage(2), 500);
-    const timer2 = setTimeout(() => setActiveStage(3), 1100);
+    // 800ms per stage (Total ~2.4s) to allow crisp video narration
+    const timer1 = setTimeout(() => setActiveStage(2), 800);
+    const timer2 = setTimeout(() => setActiveStage(3), 1600);
 
     return () => {
       clearTimeout(timer1);

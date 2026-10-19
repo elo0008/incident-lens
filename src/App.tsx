@@ -48,10 +48,10 @@ export const App: React.FC = () => {
     const targetText = textToSynthesize || rawLog;
     const settings = getStoredAISettings();
 
-    // Give 1200ms so 3-stage pulse shows smoothly
+    // 2400ms allows the 3-stage progress pulse to transition through all steps (800ms each)
     const [result] = await Promise.all([
       synthesizeIncidentLogs(targetText, settings),
-      new Promise((res) => setTimeout(res, 1200))
+      new Promise((res) => setTimeout(res, 2400))
     ]);
 
     setIncident(result.incident);

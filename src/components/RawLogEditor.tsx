@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Edit3, Eye, Play, RotateCcw, Sparkles, Terminal, X } from 'lucide-react';
+import { Edit3, Eye, Play, RotateCcw, Terminal, X } from 'lucide-react';
 import { SynthesisStatus } from '../types/incident';
 
 interface RawLogEditorProps {
@@ -27,7 +27,9 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const highlightedRef = useRef<HTMLDivElement | null>(null);
-  const containerRef = useRef<HTMLDivElement | null>(null);
+  const gutterRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const inspectScrollRef = useRef<HTMLDivElement | null>(null);
 
   const lines = rawLog ? rawLog.split('\n') : [];
   const lineCount = lines.length;
@@ -49,6 +51,13 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
       setIsEditing(true);
     }
   }, [rawLog]);
+
+  // Synchronize textarea vertical scroll with gutter
+  const handleTextareaScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = e.currentTarget.scrollTop;
+    }
+  };
 
   return (
     <div className="h-full flex flex-col bg-slate-900/60 border-r border-slate-800 overflow-hidden">
@@ -135,46 +144,55 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
       )}
 
       {/* Editor Body */}
-      <div
-        ref={containerRef}
-        className="flex-1 relative overflow-auto bg-slate-950 font-mono text-xs flex"
-      >
+      <div className="flex-1 relative overflow-hidden bg-slate-950 font-mono text-xs flex">
         {isEditing || lines.length === 0 ? (
-          /* Editable Textarea Mode */
-          <div className="flex w-full min-h-full">
-            {/* Gutter Line Numbers */}
-            <div className="w-12 py-3 bg-slate-950/90 border-r border-slate-800/60 text-slate-600 select-none text-right pr-2 shrink-0 font-mono leading-relaxed">
+          /* Editable Textarea Mode with Synchronized Gutter */
+          <div className="flex w-full h-full overflow-hidden">
+            {/* Gutter Line Numbers - Scroll synchronized to textarea */}
+            <div
+              ref={gutterRef}
+              className="w-12 py-3 bg-slate-950/90 border-r border-slate-800/60 text-slate-600 select-none text-right pr-2 shrink-0 font-mono overflow-hidden"
+            >
               {lines.length > 0 ? (
-                lines.map((_, i) => <div key={i}>{i + 1}</div>)
+                lines.map((_, i) => (
+                  <div key={i} className="h-6 leading-6 text-right pr-1">
+                    {i + 1}
+                  </div>
+                ))
               ) : (
-                <div>1</div>
+                <div className="h-6 leading-6 text-right pr-1">1</div>
               )}
             </div>
 
             {/* Native Textarea */}
             <textarea
+              ref={textareaRef}
               id="raw-log-textarea"
               value={rawLog}
               onChange={(e) => onChange(e.target.value)}
+              onScroll={handleTextareaScroll}
               disabled={status === 'loading'}
               placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr click "Load Demo Incident" in the header to load our 42-minute Flash Sale incident.`}
-              className="flex-1 p-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-relaxed selection:bg-cyan-500/30 whitespace-pre"
+              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-auto whitespace-pre selection:bg-cyan-500/30"
               spellCheck={false}
             />
           </div>
         ) : (
-          /* Interactive Highlighted Line Viewer Mode */
-          <div className="w-full flex">
-            {/* Gutter Line Numbers with Active Indicators */}
-            <div className="w-12 py-3 bg-slate-950 border-r border-slate-800/60 text-slate-600 select-none text-right pr-2 shrink-0 font-mono leading-relaxed">
+          /* Interactive Line Viewer Mode - Single Scroll Container */
+          <div
+            ref={inspectScrollRef}
+            className="w-full h-full overflow-auto flex scroll-smooth"
+          >
+            {/* Gutter Column */}
+            <div className="w-12 py-3 bg-slate-950 border-r border-slate-800/60 text-slate-600 select-none text-right pr-2 shrink-0 font-mono sticky left-0 z-10">
               {lines.map((_, i) => {
                 const isHighlighted = highlightedLineIndices.includes(i);
                 return (
                   <div
                     key={i}
-                    className={`transition-colors ${
+                    className={`h-6 leading-6 flex items-center justify-end pr-1 transition-colors ${
                       isHighlighted
-                        ? 'text-cyan-300 font-bold bg-cyan-500/20 rounded-l pl-1'
+                        ? 'text-cyan-300 font-bold bg-cyan-500/20 rounded-l'
                         : 'text-slate-600'
                     }`}
                   >
@@ -184,8 +202,8 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
               })}
             </div>
 
-            {/* Line Content */}
-            <div className="flex-1 py-3 overflow-x-auto leading-relaxed">
+            {/* Lines Column */}
+            <div className="flex-1 py-3 overflow-x-auto">
               {lines.map((line, i) => {
                 const isHighlighted = highlightedLineIndices.includes(i);
                 const isFirstHighlighted = highlightedLineIndices[0] === i;
@@ -194,7 +212,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                   <div
                     key={i}
                     ref={isFirstHighlighted ? highlightedRef : null}
-                    className={`px-3 transition-colors ${
+                    className={`h-6 leading-6 px-3 transition-colors flex items-center ${
                       isHighlighted
                         ? 'bg-cyan-500/15 border-l-2 border-cyan-400 text-cyan-200 font-medium'
                         : 'text-slate-300 hover:bg-slate-900/50'
