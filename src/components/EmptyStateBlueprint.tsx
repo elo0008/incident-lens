@@ -1,19 +1,24 @@
 import React from 'react';
-import { ArrowLeft, Clock, GitBranch, Play, Sparkles } from 'lucide-react';
+import { ArrowLeft, Clock, Database, GitBranch, Network, Sparkles } from 'lucide-react';
+import { DEMO_PRESETS } from '../data/demoIncident';
 
 interface EmptyStateBlueprintProps {
-  onLoadDemo: () => void;
-  onSynthesize?: () => void;
-  hasLogsLoaded?: boolean;
-  lineCount?: number;
+  onLoadDemo: (autoSynthesize?: boolean) => void;
+  onSelectPreset?: (presetId: string) => void;
 }
 
 export const EmptyStateBlueprint: React.FC<EmptyStateBlueprintProps> = ({
   onLoadDemo,
-  onSynthesize,
-  hasLogsLoaded = false,
-  lineCount = 0
+  onSelectPreset
 }) => {
+  const handlePresetClick = (presetId: string) => {
+    if (onSelectPreset) {
+      onSelectPreset(presetId);
+    } else {
+      onLoadDemo(true);
+    }
+  };
+
   return (
     <div className="h-full flex flex-col items-center justify-center p-6 md:p-8 text-center select-none overflow-y-auto">
       <div className="max-w-md w-full border border-dashed border-slate-800 rounded-xl p-6 md:p-8 bg-slate-900/40 relative overflow-hidden group hover:border-slate-700 transition-colors shadow-xl">
@@ -25,59 +30,52 @@ export const EmptyStateBlueprint: React.FC<EmptyStateBlueprintProps> = ({
             <Clock className="w-6 h-6 stroke-[1.5]" />
           </div>
 
-          {hasLogsLoaded ? (
-            <>
-              <h3 className="text-base font-semibold text-slate-200 tracking-tight mb-2">
-                Logs Ready for Analysis ({lineCount} {lineCount === 1 ? 'line' : 'lines'})
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                Incident logs are loaded in the editor. Click{' '}
-                <strong className="text-cyan-300 font-semibold">Synthesize Timeline</strong> to extract
-                milestones, calculate triage rabbit holes, and generate the SRE postmortem.
-              </p>
+          <h3 className="text-base font-semibold text-slate-200 tracking-tight mb-2">
+            No Incident Timeline Synthesized
+          </h3>
+          <p className="text-xs text-slate-400 leading-relaxed mb-5">
+            Paste raw Slack, Discord, or alert logs on the left, or test the synthesis pipeline instantly with our realistic SRE incident presets:
+          </p>
 
-              <div className="space-y-3 w-full">
+          <div className="space-y-2.5 w-full">
+            {DEMO_PRESETS.map((preset) => {
+              const Icon = preset.id === 'db_deadlock' ? Database : Network;
+
+              return (
                 <button
-                  id="empty-synthesize-btn"
-                  onClick={onSynthesize}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 border border-cyan-300 text-slate-950 font-semibold text-xs transition-all shadow-lg shadow-cyan-950/60 ring-2 ring-cyan-400/40 animate-pulse"
+                  key={preset.id}
+                  id={`empty-preset-${preset.id}-btn`}
+                  onClick={() => handlePresetClick(preset.id)}
+                  className="w-full flex items-center justify-between p-3 rounded-lg bg-slate-900 hover:bg-slate-850 border border-slate-800 hover:border-cyan-500/50 text-left transition-all group/btn shadow-md"
                 >
-                  <Play className="w-4 h-4 fill-current" />
-                  <span>Synthesize Timeline</span>
+                  <div className="flex items-center space-x-3 min-w-0">
+                    <div className="p-2 rounded-md bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 group-hover/btn:bg-cyan-500/20 transition-colors shrink-0">
+                      <Icon className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-semibold text-xs text-slate-100 group-hover/btn:text-cyan-300 transition-colors">
+                          {preset.name}
+                        </span>
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                          {preset.badge}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        {preset.subtitle}
+                      </p>
+                    </div>
+                  </div>
+                  <Sparkles className="w-3.5 h-3.5 text-cyan-400 opacity-60 group-hover/btn:opacity-100 shrink-0 ml-2" />
                 </button>
+              );
+            })}
 
-                <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-500 pt-1">
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Or click Synthesize Timeline in the left panel</span>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <h3 className="text-base font-semibold text-slate-200 tracking-tight mb-2">
-                No Incident Timeline Synthesized
-              </h3>
-              <p className="text-xs text-slate-400 leading-relaxed mb-6">
-                Select a scenario preset from the header, paste raw Slack, Discord, or alert logs on the left, then click Synthesize.
-              </p>
-
-              <div className="space-y-3 w-full">
-                <button
-                  id="empty-load-demo-btn"
-                  onClick={onLoadDemo}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 border border-cyan-400 text-slate-950 font-semibold text-xs transition-all shadow-md shadow-cyan-950/60"
-                >
-                  <Sparkles className="w-4 h-4 fill-current" />
-                  <span>Load Flash Sale Scenario Logs</span>
-                </button>
-
-                <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-500 pt-1">
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Or paste custom incident logs on the left</span>
-                </div>
-              </div>
-            </>
-          )}
+            <div className="flex items-center justify-center space-x-2 text-[11px] text-slate-500 pt-2">
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Or paste custom incident logs on the left</span>
+            </div>
+          </div>
 
           {/* Blueprint preview wireframe */}
           <div className="mt-6 pt-5 border-t border-slate-800/80 w-full flex items-center justify-between text-[11px] text-slate-500 font-mono">

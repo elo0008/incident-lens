@@ -5,7 +5,7 @@ import { EmptyStateBlueprint } from './components/EmptyStateBlueprint';
 import { TimelineView } from './components/TimelineView';
 import { PostmortemView } from './components/PostmortemView';
 import { LoadingPulse } from './components/LoadingPulse';
-import { DEMO_RAW_LOG, DEADLOCK_RAW_LOG, DEMO_PRESETS } from './data/demoIncident';
+import { DEMO_PRESETS, DEMO_RAW_LOG } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
 import { getStoredAISettings, synthesizeIncidentLogs } from './services/synthesisService';
 import { SynthesizedIncident, SynthesisStatus, TimelineEvent, ViewMode } from './types/incident';
@@ -21,38 +21,52 @@ export const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [copiedHeader, setCopiedHeader] = useState<boolean>(false);
   const [activeMode, setActiveMode] = useState<'offline_verified' | 'live_ai'>('offline_verified');
-  const [selectedPresetId, setSelectedPresetId] = useState<'flash_sale' | 'db_deadlock'>('flash_sale');
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
 
   const handleRawLogChange = (newVal: string) => {
     setRawLog(newVal);
     if (warningMessage) {
       setWarningMessage(null);
     }
+    // Check if typed log matches any preset
+    const matchingPreset = DEMO_PRESETS.find(p => p.rawLog.trim() === newVal.trim());
+    setActivePresetId(matchingPreset ? matchingPreset.id : null);
   };
 
-  // Switch scenario preset: populates raw logs ONLY into left editor; resets right pane to idle
-  const handleSelectPreset = (presetId: 'flash_sale' | 'db_deadlock') => {
-    setSelectedPresetId(presetId);
+  // Instant preset switcher: loads raw logs + verified synthesis immediately
+  const handleSelectPreset = (presetId: string) => {
     const preset = DEMO_PRESETS.find((p) => p.id === presetId) || DEMO_PRESETS[0];
+    setActivePresetId(preset.id);
     setRawLog(preset.rawLog);
-    setIncident(null);
-    setStatus('idle');
+    setIncident(preset.synthesizedData);
+    setStatus('success');
+    setActiveMode('offline_verified');
     setWarningMessage(null);
-    setSelectedEventId(null);
-    setHighlightedLineIndices([]);
-    setViewMode('timeline');
+
+    // Auto-select false lead milestone to display kernel immediately
+    const falseLeadEvent = preset.synthesizedData.events.find((e) => e.type === 'FALSE_LEAD');
+    if (falseLeadEvent) {
+      setSelectedEventId(falseLeadEvent.id);
+      setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
+    } else {
+      setSelectedEventId(null);
+      setHighlightedLineIndices([]);
+    }
   };
 
-  // Load demo scenario into editor without auto-synthesizing
-  const handleLoadDemo = () => {
-    const preset = DEMO_PRESETS.find((p) => p.id === selectedPresetId) || DEMO_PRESETS[0];
-    setRawLog(preset.rawLog);
-    setIncident(null);
-    setStatus('idle');
-    setWarningMessage(null);
-    setSelectedEventId(null);
-    setHighlightedLineIndices([]);
-    setViewMode('timeline');
+  // Legacy demo loader fallback
+  const handleLoadDemo = (autoSynthesize = true) => {
+    if (autoSynthesize) {
+      handleSelectPreset('flash_sale');
+    } else {
+      setRawLog(DEMO_RAW_LOG);
+      setActivePresetId('flash_sale');
+      setWarningMessage(null);
+      setSelectedEventId(null);
+      setHighlightedLineIndices([]);
+      setIncident(null);
+      setStatus('idle');
+    }
   };
 
   const triggerSynthesisProcess = async (textToSynthesize?: string) => {
@@ -99,6 +113,7 @@ export const App: React.FC = () => {
     setSelectedEventId(null);
     setHighlightedLineIndices([]);
     setViewMode('timeline');
+    setActivePresetId(null);
   };
 
   const handleSelectEvent = (event: TimelineEvent) => {
@@ -122,19 +137,15 @@ export const App: React.FC = () => {
     }
   };
 
-  const isDemoLoaded =
-    rawLog.trim() === DEMO_RAW_LOG.trim() || rawLog.trim() === DEADLOCK_RAW_LOG.trim();
   const selectedEvent = incident?.events.find((e) => e.id === selectedEventId);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans">
       {/* Top Navbar */}
       <TopNavbar
-        onLoadDemo={handleLoadDemo}
         onSelectPreset={handleSelectPreset}
-        selectedPresetId={selectedPresetId}
         status={status}
-        isDemoLoaded={isDemoLoaded}
+        activePresetId={activePresetId}
         activeMode={activeMode}
       />
 
@@ -192,22 +203,26 @@ export const App: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Quick Copy Markdown Action */}
+                {/* Persistent Quick Copy Button */}
                 <button
                   id="header-copy-markdown-btn"
                   onClick={handleCopyHeaderMarkdown}
-                  className="flex items-center space-x-1 text-xs font-mono text-slate-400 hover:text-slate-200 px-2 py-1 rounded hover:bg-slate-800 transition-colors"
-                  title="Copy full postmortem markdown"
+                  className={`flex items-center space-x-1.5 text-xs font-mono px-2.5 py-1 rounded border transition-all ${
+                    copiedHeader
+                      ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                      : 'bg-slate-850 hover:bg-slate-800 border-slate-700 text-slate-300 hover:text-slate-100'
+                  }`}
+                  title="Copy synthesized postmortem markdown to clipboard"
                 >
                   {copiedHeader ? (
                     <>
-                      <Check className="w-3 h-3 text-emerald-400" />
-                      <span className="text-emerald-400">Copied!</span>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Copied!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3 h-3" />
-                      <span className="hidden sm:inline">Copy Postmortem</span>
+                      <Copy className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Copy MD</span>
                     </>
                   )}
                 </button>
@@ -229,9 +244,7 @@ export const App: React.FC = () => {
           ) : (
             <EmptyStateBlueprint
               onLoadDemo={handleLoadDemo}
-              onSynthesize={handleSynthesize}
-              hasLogsLoaded={rawLog.trim().length > 0}
-              lineCount={rawLog.trim().length > 0 ? rawLog.trim().split('\n').length : 0}
+              onSelectPreset={handleSelectPreset}
             />
           )}
         </section>

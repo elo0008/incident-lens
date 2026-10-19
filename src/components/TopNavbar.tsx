@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Activity,
   Check,
@@ -6,6 +6,7 @@ import {
   Database,
   Key,
   Layers,
+  Network,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -15,41 +16,41 @@ import {
 } from 'lucide-react';
 import { SynthesisStatus } from '../types/incident';
 import { AISettings, getStoredAISettings, saveAISettings } from '../services/synthesisService';
-import { DEMO_PRESETS } from '../data/demoIncident';
+import { DEMO_PRESETS, IncidentPreset } from '../data/demoIncident';
 
 interface TopNavbarProps {
-  onLoadDemo: () => void;
-  onSelectPreset: (presetId: 'flash_sale' | 'db_deadlock') => void;
-  selectedPresetId: 'flash_sale' | 'db_deadlock';
+  onSelectPreset: (presetId: string) => void;
   status: SynthesisStatus;
-  isDemoLoaded: boolean;
+  activePresetId: string | null;
   activeMode: 'offline_verified' | 'live_ai';
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
-  onLoadDemo,
   onSelectPreset,
-  selectedPresetId,
   status,
-  isDemoLoaded,
+  activePresetId,
   activeMode
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
-  const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState<boolean>(false);
+  const [isPresetMenuOpen, setIsPresetMenuOpen] = useState<boolean>(false);
   const [settings, setSettings] = useState<AISettings>(getStoredAISettings);
   const [savedNotice, setSavedNotice] = useState<boolean>(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const presetDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown on click outside
+  // Close dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsPresetDropdownOpen(false);
+      if (presetDropdownRef.current && !presetDropdownRef.current.contains(event.target as Node)) {
+        setIsPresetMenuOpen(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (isPresetMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isPresetMenuOpen]);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +62,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     }, 1200);
   };
 
-  const currentPreset = DEMO_PRESETS.find(p => p.id === selectedPresetId) || DEMO_PRESETS[0];
+  const currentPreset = DEMO_PRESETS.find(p => p.id === activePresetId) || DEMO_PRESETS[0];
 
   return (
     <>
@@ -106,86 +107,69 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center space-x-2.5">
-          {/* Multi-Scenario Preset Selector Dropdown */}
-          <div className="relative" ref={dropdownRef}>
+          {/* Multi-Scenario Preset Dropdown */}
+          <div className="relative" ref={presetDropdownRef}>
             <button
               id="navbar-preset-dropdown-btn"
-              onClick={() => setIsPresetDropdownOpen(!isPresetDropdownOpen)}
+              onClick={() => setIsPresetMenuOpen(!isPresetMenuOpen)}
               disabled={status === 'loading'}
-              className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md border bg-slate-800/90 border-slate-700 hover:border-cyan-500/50 text-slate-200 transition-all shadow-sm"
-              title="Select incident scenario preset"
+              className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md border border-cyan-500/40 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 shadow-sm shadow-cyan-950/40 transition-all"
+              title="Select realistic verified incident scenario preset"
             >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span className="hidden sm:inline font-mono text-[11px] text-cyan-300">Preset:</span>
-              <span className="font-semibold text-slate-100">{currentPreset.title}</span>
-              <ChevronDown
-                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
-                  isPresetDropdownOpen ? 'rotate-180' : ''
-                }`}
-              />
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="hidden sm:inline font-mono font-semibold">Preset:</span>
+              <span className="text-slate-100">{currentPreset.name}</span>
+              <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 transition-transform ${isPresetMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
-            {isPresetDropdownOpen && (
-              <div className="absolute right-0 mt-2 w-80 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-30 animate-fadeIn space-y-1.5">
-                <div className="px-2.5 py-1 text-[10px] font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800/80 pb-1.5">
-                  <span>Verified SRE Scenarios</span>
-                  <span className="text-cyan-400">Deterministic</span>
+            {/* Dropdown Menu */}
+            {isPresetMenuOpen && (
+              <div className="absolute right-0 mt-2 w-72 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl z-50 py-1.5 animate-fadeIn">
+                <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-mono uppercase text-slate-400 tracking-wider flex items-center justify-between">
+                  <span>Incident Scenarios</span>
+                  <span className="text-cyan-400">Offline Verified</span>
                 </div>
-                {DEMO_PRESETS.map((preset) => {
-                  const isSelected = selectedPresetId === preset.id;
-                  const Icon = preset.id === 'flash_sale' ? Layers : Database;
-                  return (
-                    <button
-                      key={preset.id}
-                      onClick={() => {
-                        onSelectPreset(preset.id);
-                        setIsPresetDropdownOpen(false);
-                      }}
-                      className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-start space-x-2.5 ${
-                        isSelected
-                          ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-200 shadow-sm'
-                          : 'bg-slate-950/40 border-slate-800 hover:bg-slate-800/80 hover:border-slate-700 text-slate-300'
-                      }`}
-                    >
-                      <div
-                        className={`p-1.5 rounded-md mt-0.5 shrink-0 ${
+
+                <div className="p-1 space-y-1">
+                  {DEMO_PRESETS.map((preset) => {
+                    const isSelected = activePresetId === preset.id;
+                    const Icon = preset.id === 'db_deadlock' ? Database : Network;
+
+                    return (
+                      <button
+                        key={preset.id}
+                        onClick={() => {
+                          onSelectPreset(preset.id);
+                          setIsPresetMenuOpen(false);
+                        }}
+                        className={`w-full text-left p-2.5 rounded-lg text-xs transition-all flex items-start space-x-2.5 ${
                           isSelected
-                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
-                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                            ? 'bg-cyan-500/15 border border-cyan-500/30 text-slate-100'
+                            : 'hover:bg-slate-800/80 text-slate-300 hover:text-slate-100 border border-transparent'
                         }`}
                       >
-                        <Icon className="w-3.5 h-3.5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-semibold text-slate-100">{preset.title}</span>
-                          {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-1" />}
+                        <div className={`mt-0.5 p-1.5 rounded-md ${
+                          isSelected ? 'bg-cyan-500/20 text-cyan-300' : 'bg-slate-800 text-slate-400'
+                        }`}>
+                          <Icon className="w-3.5 h-3.5" />
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
-                          {preset.subtitle}
-                        </p>
-                      </div>
-                    </button>
-                  );
-                })}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-xs text-slate-100">{preset.name}</span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0" />}
+                          </div>
+                          <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{preset.subtitle}</p>
+                          <span className="inline-block mt-1 text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800/80 text-cyan-300 border border-slate-700/60">
+                            {preset.badge}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
           </div>
-
-          {/* Quick Re-load Demo Button */}
-          <button
-            id="navbar-load-demo-btn"
-            onClick={onLoadDemo}
-            disabled={status === 'loading'}
-            className={`hidden sm:flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-all ${
-              isDemoLoaded
-                ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'
-                : 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20 shadow-sm shadow-cyan-950/40'
-            }`}
-            title="Populate current scenario logs into editor"
-          >
-            <span>Load Logs</span>
-          </button>
 
           {/* Settings Trigger */}
           <button
@@ -217,7 +201,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               </div>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className="text-slate-500 hover:text-slate-300 transition-colors"
+                className="text-slate-400 hover:text-slate-200 p-1 rounded"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -225,67 +209,53 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                  LLM Provider
-                </label>
-                <select
-                  value={settings.provider}
-                  onChange={(e) =>
-                    setSettings({ ...settings, provider: e.target.value as 'openai' | 'gemini' })
-                  }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="openai">OpenAI (ChatCompletions API)</option>
-                  <option value="gemini">Google Gemini (JSON Mode)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                  API Key
+                <label className="block text-xs font-mono text-slate-300 mb-1">
+                  OpenAI-Compatible API Key (Optional)
                 </label>
                 <input
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  placeholder="sk-... or AIzaSy... (Leave empty for Offline Demo)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+                  placeholder="sk-... (Leave empty for Offline Demo Mode)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
                 />
-                <p className="text-[11px] text-slate-400 mt-1">
-                  Stored securely in your browser's localStorage. Zero server tracking.
+                <p className="text-[11px] text-slate-500 mt-1">
+                  Keys are stored exclusively in your local browser storage. If empty, IncidentLens uses the deterministic offline fallback engine.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1.5">
-                  Model Identifier
-                </label>
-                <input
-                  type="text"
+                <label className="block text-xs font-mono text-slate-300 mb-1">Model</label>
+                <select
                   value={settings.model}
                   onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-                  placeholder="gpt-4o-mini or gemini-1.5-pro"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
-                />
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="gpt-4o-mini">gpt-4o-mini (Fast & Structured)</option>
+                  <option value="gpt-4o">gpt-4o</option>
+                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
+                </select>
               </div>
 
-              <div className="pt-2 flex items-center justify-between border-t border-slate-800">
-                <span className="text-[11px] font-mono text-cyan-400">
-                  {savedNotice && 'Settings saved!'}
+              <div className="pt-2 flex items-center justify-between">
+                <span className="text-xs text-emerald-400 font-mono">
+                  {savedNotice ? '✓ Saved settings!' : ''}
                 </span>
-                <div className="flex space-x-2">
+
+                <div className="flex items-center space-x-2">
                   <button
                     type="button"
                     onClick={() => setIsSettingsOpen(false)}
-                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+                    className="px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:text-slate-200"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 text-xs font-medium rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors shadow-sm"
+                    className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs font-mono transition-colors"
                   >
-                    Save Configuration
+                    <Check className="w-3.5 h-3.5" />
+                    <span>Save Settings</span>
                   </button>
                 </div>
               </div>
