@@ -9,7 +9,7 @@ import { DEMO_PRESETS, DEMO_RAW_LOG } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
 import { getStoredAISettings, synthesizeIncidentLogs } from './services/synthesisService';
 import { SynthesizedIncident, SynthesisStatus, TimelineEvent, ViewMode } from './types/incident';
-import { Check, Clock, Copy, Download, FileText, ListTodo } from 'lucide-react';
+import { Clock, FileText } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [rawLog, setRawLog] = useState<string>('');
@@ -19,8 +19,6 @@ export const App: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [highlightedLineIndices, setHighlightedLineIndices] = useState<number[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
-  const [copiedDoc, setCopiedDoc] = useState<boolean>(false);
-  const [copiedTasks, setCopiedTasks] = useState<boolean>(false);
   const [activeMode, setActiveMode] = useState<'offline_verified' | 'live_ai'>('offline_verified');
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
 
@@ -110,46 +108,6 @@ export const App: React.FC = () => {
     setHighlightedLineIndices([]);
   };
 
-  const handleCopyMarkdown = async () => {
-    if (!incident) return;
-    try {
-      await navigator.clipboard.writeText(incident.markdownReport);
-      setCopiedDoc(true);
-      setTimeout(() => setCopiedDoc(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy markdown', err);
-    }
-  };
-
-  const handleCopyTasks = async () => {
-    if (!incident) return;
-    try {
-      const title = incident.executiveSummary.title;
-      let md = `### Incident Action Items: ${title}\n\n`;
-      incident.actionItems.forEach((item) => {
-        md += `- [ ] **[${item.priority}]** ${item.action} (Owner: ${item.owner})\n`;
-      });
-      await navigator.clipboard.writeText(md);
-      setCopiedTasks(true);
-      setTimeout(() => setCopiedTasks(false), 2000);
-    } catch (err) {
-      console.error('Failed to copy tasks', err);
-    }
-  };
-
-  const handleDownloadMd = () => {
-    if (!incident) return;
-    const blob = new Blob([incident.markdownReport], { type: 'text/markdown;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'incident-postmortem.md');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
-
   const selectedEvent = incident?.events.find((e) => e.id === selectedEventId);
 
   return (
@@ -185,14 +143,14 @@ export const App: React.FC = () => {
             <LoadingPulse />
           ) : incident && status === 'success' ? (
             <div className="h-full flex flex-col overflow-hidden">
-              {/* Row 1: View Switcher & Consolidated Action Bar */}
-              <div className="h-12 px-4 border-b border-slate-800 bg-slate-900/95 flex items-center justify-between shrink-0 flex-wrap gap-2">
+              {/* Segmented View Mode Toggle Header */}
+              <div className="h-10 px-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between shrink-0">
                 {/* View Mode Switcher */}
                 <div className="flex items-center space-x-1 p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono">
                   <button
                     id="tab-timeline-view"
                     onClick={() => setViewMode('timeline')}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all ${
                       viewMode === 'timeline'
                         ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
@@ -205,7 +163,7 @@ export const App: React.FC = () => {
                   <button
                     id="tab-postmortem-view"
                     onClick={() => setViewMode('postmortem')}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all ${
                       viewMode === 'postmortem'
                         ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
@@ -213,67 +171,6 @@ export const App: React.FC = () => {
                   >
                     <FileText className="w-3.5 h-3.5" />
                     <span>Postmortem Markdown</span>
-                  </button>
-                </div>
-
-                {/* Consolidated Export Action Button Group */}
-                <div className="flex items-center space-x-2">
-                  <button
-                    id="header-copy-jira-tasks-btn"
-                    onClick={handleCopyTasks}
-                    className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono border transition-all ${
-                      copiedTasks
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-sm'
-                        : 'bg-slate-800/80 hover:bg-slate-800 border-slate-700/80 text-slate-300 hover:text-slate-100 hover:border-slate-600'
-                    }`}
-                    title="Copy action items as GitHub/Jira markdown checklist"
-                  >
-                    {copiedTasks ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Copied Tasks!</span>
-                      </>
-                    ) : (
-                      <>
-                        <ListTodo className="w-3.5 h-3.5 text-amber-400" />
-                        <span className="hidden sm:inline">Copy Jira Tasks</span>
-                        <span className="sm:hidden">Tasks</span>
-                      </>
-                    )}
-                  </button>
-
-                  <button
-                    id="header-export-md-btn"
-                    onClick={handleDownloadMd}
-                    className="flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs font-mono bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-slate-100 hover:border-slate-600 transition-all"
-                    title="Download incident-postmortem.md file"
-                  >
-                    <Download className="w-3.5 h-3.5 text-slate-400" />
-                    <span className="hidden sm:inline">Export .md</span>
-                    <span className="sm:hidden">.md</span>
-                  </button>
-
-                  <button
-                    id="header-copy-markdown-btn"
-                    onClick={handleCopyMarkdown}
-                    className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-md text-xs font-mono font-medium border transition-all ${
-                      copiedDoc
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300 shadow-sm'
-                        : 'bg-cyan-500/15 hover:bg-cyan-500/25 border-cyan-500/40 text-cyan-200 shadow-sm shadow-cyan-950/40'
-                    }`}
-                    title="Copy full synthesized postmortem markdown"
-                  >
-                    {copiedDoc ? (
-                      <>
-                        <Check className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>Copied!</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                        <span>Copy Markdown</span>
-                      </>
-                    )}
                   </button>
                 </div>
               </div>
