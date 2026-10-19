@@ -234,7 +234,11 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
           id="synthesize-btn"
           onClick={onSynthesize}
           disabled={status === 'loading' || rawLog.trim().length === 0}
-          className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-950 font-semibold text-xs tracking-wide transition-all shadow-md shadow-cyan-950/50 hover:shadow-cyan-900/40"
+          className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-slate-950 font-semibold text-xs tracking-wide transition-all disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed ${
+            rawLog.trim().length > 0 && status !== 'loading'
+              ? 'bg-gradient-to-r from-cyan-400 via-cyan-300 to-cyan-400 hover:from-cyan-300 hover:to-cyan-200 text-slate-950 shadow-lg shadow-cyan-500/30 ring-2 ring-cyan-400/50 hover:ring-cyan-300 animate-pulse'
+              : 'bg-cyan-500 hover:bg-cyan-400 text-slate-950'
+          }`}
         >
           {status === 'loading' ? (
             <>

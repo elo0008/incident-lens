@@ -182,9 +182,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'
                 : 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20 shadow-sm shadow-cyan-950/40'
             }`}
-            title="Reload current scenario into the raw editor"
+            title="Populate current scenario logs into editor"
           >
-            <span>Reload</span>
+            <span>Load Logs</span>
           </button>
 
           {/* Settings Trigger */}

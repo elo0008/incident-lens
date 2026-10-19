@@ -30,38 +30,29 @@ export const App: React.FC = () => {
     }
   };
 
-  // Switch scenario preset: instantly load raw logs and verified synthesis
+  // Switch scenario preset: populates raw logs ONLY into left editor; resets right pane to idle
   const handleSelectPreset = (presetId: 'flash_sale' | 'db_deadlock') => {
     setSelectedPresetId(presetId);
     const preset = DEMO_PRESETS.find((p) => p.id === presetId) || DEMO_PRESETS[0];
     setRawLog(preset.rawLog);
-    setWarningMessage(null);
-    setIncident(preset.synthesized);
-    setActiveMode('offline_verified');
-    setStatus('success');
-
-    // Auto-select false lead to immediately showcase the visual kernel
-    const falseLeadEvent = preset.synthesized.events.find((e) => e.type === 'FALSE_LEAD');
-    if (falseLeadEvent) {
-      setSelectedEventId(falseLeadEvent.id);
-      setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
-    } else {
-      setSelectedEventId(null);
-      setHighlightedLineIndices([]);
-    }
-  };
-
-  // Load demo scenario into editor
-  const handleLoadDemo = (autoSynthesize = false) => {
-    const preset = DEMO_PRESETS.find((p) => p.id === selectedPresetId) || DEMO_PRESETS[0];
-    setRawLog(preset.rawLog);
+    setIncident(null);
+    setStatus('idle');
     setWarningMessage(null);
     setSelectedEventId(null);
     setHighlightedLineIndices([]);
+    setViewMode('timeline');
+  };
 
-    if (autoSynthesize) {
-      triggerSynthesisProcess(preset.rawLog);
-    }
+  // Load demo scenario into editor without auto-synthesizing
+  const handleLoadDemo = () => {
+    const preset = DEMO_PRESETS.find((p) => p.id === selectedPresetId) || DEMO_PRESETS[0];
+    setRawLog(preset.rawLog);
+    setIncident(null);
+    setStatus('idle');
+    setWarningMessage(null);
+    setSelectedEventId(null);
+    setHighlightedLineIndices([]);
+    setViewMode('timeline');
   };
 
   const triggerSynthesisProcess = async (textToSynthesize?: string) => {
@@ -236,7 +227,12 @@ export const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <EmptyStateBlueprint onLoadDemo={() => handleLoadDemo(true)} />
+            <EmptyStateBlueprint
+              onLoadDemo={handleLoadDemo}
+              onSynthesize={handleSynthesize}
+              hasLogsLoaded={rawLog.trim().length > 0}
+              lineCount={rawLog.trim().length > 0 ? rawLog.trim().split('\n').length : 0}
+            />
           )}
         </section>
       </main>
