@@ -3,23 +3,23 @@ export interface ValidationResult {
   error?: string;
 }
 
-const TIMESTAMP_REGEXES = [
-  /\[\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:UTC|GMT|Z))?\]/i, // [14:02:11] or [14:02 UTC]
-  /\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:UTC|GMT|Z|AM|PM|EST|PST|PDT|EDT)\b/i, // 14:02 UTC or 2:05 PM
-  /\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}(?::\d{2})?\b/, // 2026-10-18T14:02
-  /\b\d{1,2}:\d{2}:\d{2}\b/ // 14:02:11
+const TIMESTAMP_PATTERNS = [
+  // Bracketed time formats: [14:02:11], [14:02 UTC], [14:02], [2026-10-19T14:02:00Z]
+  /\[\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*(?:UTC|GMT|Z|[A-Z]{2,4}))?\s*\]/i,
+  // ISO-8601 variations: 2026-10-19T14:02:00Z, 2026-10-19 14:02, 2026-10-19T14:02
+  /\b\d{4}-\d{2}-\d{2}[T\s]\d{1,2}:\d{2}(?::\d{2})?(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2})?\b/i,
+  // 12-hour AM/PM formats: 02:03 PM, 2:03pm, [02:03 PM]
+  /\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:AM|PM)\b/i,
+  // Time with timezone: 14:02 UTC, 14:02:15 GMT, 14:02 PST
+  /\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:UTC|GMT|Z|[A-Z]{3,4})\b/i,
+  // Standard 24h clock with seconds: 14:02:15
+  /\b\d{1,2}:\d{2}:\d{2}\b/,
+  // Standard 24h clock: 23:58, 00:04, 14:02
+  /\b(?:[01]?\d|2[0-3]):[0-5]\d\b/
 ];
 
 export function validateInputLogs(rawLog: string): ValidationResult {
-  const trimmed = rawLog.trim();
-  if (!trimmed) {
-    return {
-      isValid: false,
-      error: 'Log stream is empty. Paste incident messages or click "Load Demo Incident".'
-    };
-  }
-
-  const lines = trimmed.split('\n').filter(l => l.trim().length > 0);
+  const lines = rawLog.split(/\r?\n/).filter((l) => l.trim().length > 0);
   if (lines.length < 3) {
     return {
       isValid: false,
@@ -28,8 +28,8 @@ export function validateInputLogs(rawLog: string): ValidationResult {
   }
 
   // Check if at least one timestamp pattern exists
-  const hasTimestamp = lines.some(line =>
-    TIMESTAMP_REGEXES.some(regex => regex.test(line))
+  const hasTimestamp = lines.some((line) =>
+    TIMESTAMP_PATTERNS.some((regex) => regex.test(line))
   );
 
   if (!hasTimestamp) {
