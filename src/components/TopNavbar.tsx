@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
   Activity,
+  AlertTriangle,
   Check,
   ChevronDown,
   Database,
@@ -13,7 +14,13 @@ import {
   Zap
 } from 'lucide-react';
 import { SynthesisStatus } from '../types/incident';
-import { AIModel, AISettings, getStoredAISettings, saveAISettings } from '../services/synthesisService';
+import {
+  AIModel,
+  AISettings,
+  ALLOWED_MODELS,
+  getStoredAISettings,
+  saveAISettings
+} from '../services/synthesisService';
 import { DEMO_PRESETS } from '../data/demoIncident';
 
 interface TopNavbarProps {
@@ -50,6 +57,14 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     };
   }, [isPresetMenuOpen]);
 
+  // Sync settings when drawer opens
+  useEffect(() => {
+    if (isSettingsOpen) {
+      setSettings(getStoredAISettings());
+      setSavedNotice(false);
+    }
+  }, [isSettingsOpen]);
+
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
     saveAISettings(settings);
@@ -77,7 +92,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     if (activeMode === 'live_ai') {
       return {
         label: `Live AI · ${settings.model}`,
-        tooltip: `Synthesized using live OpenAI ${settings.model}.`,
+        tooltip: `Synthesized using live Gemini ${settings.model}.`,
         style: 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300',
         icon: Zap,
         iconColor: 'text-cyan-400'
@@ -85,7 +100,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     }
     return {
       label: `Live AI ready · ${settings.model}`,
-      tooltip: `OpenAI API key configured for ${settings.model}. Ready to analyze custom logs.`,
+      tooltip: `Gemini API key configured for ${settings.model}. Ready to analyze custom logs.`,
       style: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300',
       icon: Zap,
       iconColor: 'text-cyan-400'
@@ -223,18 +238,26 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono text-slate-300 mb-1">
-                  OpenAI API Key (Optional)
+                  Gemini API key (free from Google AI Studio: aistudio.google.com/apikey)
                 </label>
                 <input
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  placeholder="sk-... (Leave empty for Sample Mode)"
+                  placeholder="AIzaSy... (Leave empty for Sample Mode)"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
                 />
                 <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
-                  Without an API key, IncidentLens analyzes all built-in sample incidents. To synthesize your own custom logs, add an OpenAI API key. Your key is stored exclusively in this browser's localStorage and is sent directly to OpenAI.
+                  Without an API key, IncidentLens analyzes all built-in sample incidents. To synthesize your own custom logs, add a Gemini API key. Your key is stored exclusively in this browser's localStorage and is sent directly to Google.
                 </p>
+              </div>
+
+              {/* Privacy Warning */}
+              <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed flex items-start space-x-2">
+                <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                <span>
+                  Free-tier Gemini requests may be used by Google to improve its products. Don't paste confidential logs.
+                </span>
               </div>
 
               <div>
@@ -244,8 +267,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                   onChange={(e) => setSettings({ ...settings, model: e.target.value as AIModel })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
                 >
-                  <option value="gpt-4o-mini">gpt-4o-mini (Fast & Structured)</option>
-                  <option value="gpt-4o">gpt-4o</option>
+                  {ALLOWED_MODELS.map((modelName) => (
+                    <option key={modelName} value={modelName}>
+                      {modelName}
+                    </option>
+                  ))}
                 </select>
               </div>
 

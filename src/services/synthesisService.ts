@@ -2,26 +2,29 @@ import { ActionItem, EventType, SynthesizedIncident, TimelineEvent } from '../ty
 import { DEMO_PRESETS } from '../data/demoIncident';
 import { verifyIncident } from './verify';
 
-export type AIModel = 'gpt-4o-mini' | 'gpt-4o';
-export const ALLOWED_MODELS: AIModel[] = ['gpt-4o-mini', 'gpt-4o'];
+export const ALLOWED_MODELS = ['gemini-3.6-flash'] as const;
+export type AIModel = (typeof ALLOWED_MODELS)[number];
+export const DEFAULT_MODEL: AIModel = 'gemini-3.6-flash';
 
 export interface AISettings {
   apiKey: string;
-  provider: 'openai';
+  provider: 'gemini';
   model: AIModel;
 }
 
-const STORAGE_KEY = 'incidentlens_ai_settings';
+const STORAGE_KEY = 'incidentlens_ai_settings_v2';
 
 export function getStoredAISettings(): AISettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const model: AIModel = ALLOWED_MODELS.includes(parsed.model) ? parsed.model : 'gpt-4o-mini';
+      const model: AIModel = (ALLOWED_MODELS as readonly string[]).includes(parsed?.model)
+        ? parsed.model
+        : DEFAULT_MODEL;
       return {
-        apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
-        provider: 'openai',
+        apiKey: typeof parsed?.apiKey === 'string' ? parsed.apiKey : '',
+        provider: 'gemini',
         model
       };
     }
@@ -30,15 +33,17 @@ export function getStoredAISettings(): AISettings {
   }
   return {
     apiKey: '',
-    provider: 'openai',
-    model: 'gpt-4o-mini'
+    provider: 'gemini',
+    model: DEFAULT_MODEL
   };
 }
 
 export function saveAISettings(settings: AISettings): void {
   try {
-    const model: AIModel = ALLOWED_MODELS.includes(settings.model) ? settings.model : 'gpt-4o-mini';
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, provider: 'openai', model }));
+    const model: AIModel = (ALLOWED_MODELS as readonly string[]).includes(settings.model)
+      ? settings.model
+      : DEFAULT_MODEL;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, provider: 'gemini', model }));
   } catch (err) {
     console.error('Error saving AI settings to localStorage', err);
   }
@@ -58,7 +63,7 @@ export function getBlockingReason(rawLog: string, settings: AISettings): string 
     return null;
   }
   if (!settings.apiKey || !settings.apiKey.trim()) {
-    return `Sample mode only analyzes the ${DEMO_PRESETS.length} built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon).`;
+    return `Sample mode only analyzes the ${DEMO_PRESETS.length} built-in incidents. To analyze your own log, add a free Gemini API key in Settings (gear icon).`;
   }
   if (rawLog.length > 60000) {
     return `Input log is too long (${rawLog.length} characters). Maximum allowed length is 60,000 characters.`;
@@ -166,58 +171,116 @@ Schema:
   "markdownReport": "complete non-empty Markdown postmortem document"
 }`;
 
+  const selectedModel = (ALLOWED_MODELS as readonly string[]).includes(settings.model)
+    ? settings.model
+    : DEFAULT_MODEL;
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent`;
+
   let response: Response;
   try {
-    response = await fetch('https://api.openai.com/v1/chat/completions', {
+    response = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey.trim()}`
+        'x-goog-api-key': settings.apiKey.trim()
       },
       body: JSON.stringify({
-        model: settings.model || 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: numberedLog }
+        systemInstruction: {
+          parts: [{ text: systemPrompt }]
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: numberedLog }]
+          }
         ],
-        response_format: { type: 'json_object' },
-        temperature: 0.2
+        generationConfig: {
+          responseMimeType: 'application/json',
+          temperature: 0.2,
+          maxOutputTokens: 8192
+        }
       })
     });
   } catch (err) {
     throw new SynthesisError(
-      'Could not reach OpenAI (network or browser CORS error). Check your connection and try again.'
+      "Could not reach Google's API (network or browser CORS error). Check your connection and try again."
     );
   }
 
   if (!response.ok) {
-    if (response.status === 401) {
+    let errMessage = '';
+    try {
+      const errJson = await response.json();
+      errMessage = errJson?.error?.message || '';
+    } catch {
+      // ignore JSON parse failure on error response
+    }
+
+    if (response.status === 400) {
+      const lower = errMessage.toLowerCase();
+      if (
+        lower.includes('api key') ||
+        lower.includes('key') ||
+        lower.includes('api_key_invalid') ||
+        lower.includes('invalid_argument')
+      ) {
+        throw new SynthesisError('Google rejected the API key. Check it in Settings.');
+      }
       throw new SynthesisError(
-        'OpenAI API key was rejected (HTTP 401 Unauthorized). Please check your API key in Settings (gear icon).'
+        errMessage ? `Google API error (HTTP 400): ${errMessage}` : 'Google rejected the request (HTTP 400 Bad Request).'
+      );
+    }
+    if (response.status === 403) {
+      throw new SynthesisError(
+        'Google API permission denied (HTTP 403). The API key or Google Cloud project may be restricted, or the Generative Language API is not enabled.'
+      );
+    }
+    if (response.status === 404) {
+      throw new SynthesisError(
+        'Gemini model not found (HTTP 404). Please select a different model in Settings (gear icon).'
       );
     }
     if (response.status === 429) {
       throw new SynthesisError(
-        'OpenAI rate limit or quota exceeded (HTTP 429). Please check your account usage and quota limits.'
+        'Google Gemini quota or rate limit reached (HTTP 429). Please try again later or check your Google AI Studio quota.'
       );
     }
     throw new SynthesisError(
-      `OpenAI returned HTTP ${response.status}. Please try again.`
+      errMessage || `Google API returned HTTP ${response.status}. Please try again.`
     );
+  }
+
+  let data: any;
+  try {
+    data = await response.json();
+  } catch (err) {
+    throw new SynthesisError('Failed to parse valid JSON response from Gemini. Please try again.');
+  }
+
+  if (
+    data?.promptFeedback?.blockReason ||
+    !Array.isArray(data?.candidates) ||
+    data.candidates.length === 0
+  ) {
+    throw new SynthesisError('The AI declined to analyze this log');
+  }
+
+  const candidate = data.candidates[0];
+  if (candidate?.finishReason === 'MAX_TOKENS') {
+    throw new SynthesisError('The AI response was cut off; try a shorter log');
+  }
+
+  const textPart = candidate?.content?.parts?.[0]?.text;
+  if (!textPart || typeof textPart !== 'string') {
+    throw new SynthesisError('The AI declined to analyze this log');
   }
 
   let payload: any;
   try {
-    const data = await response.json();
-    const content = data?.choices?.[0]?.message?.content;
-    if (!content || typeof content !== 'string') {
-      throw new Error('Empty response content');
-    }
-    payload = JSON.parse(content);
+    payload = JSON.parse(textPart);
   } catch (err) {
-    throw new SynthesisError(
-      'Failed to parse valid JSON response from OpenAI. Please try again.'
-    );
+    throw new SynthesisError('Failed to parse valid JSON response from Gemini. Please try again.');
   }
 
   if (
@@ -231,7 +294,7 @@ Schema:
     !payload.markdownReport.trim()
   ) {
     throw new SynthesisError(
-      'OpenAI response is missing required incident fields (executiveSummary, rootCause, events array, or markdownReport).'
+      'Gemini response is missing required incident fields (executiveSummary, rootCause, events array, or markdownReport).'
     );
   }
 
@@ -241,7 +304,7 @@ Schema:
 
   if (validEvents.length === 0) {
     throw new SynthesisError(
-      'OpenAI response did not contain at least one valid event matching required event types.'
+      'Gemini response did not contain at least one valid event matching required event types.'
     );
   }
 
