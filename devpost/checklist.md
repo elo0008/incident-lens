@@ -49,7 +49,7 @@ Build mode: fast
   Learner check: Click [Postmortem Markdown], review the formatted SRE postmortem document, click [Copy Markdown], and paste into a scratchpad or notes app to verify format.
   Commit: `Add SRE postmortem markdown preview and one-click clipboard export`
 
-- [ ] **5. Configurable LLM API engine & graceful offline fallback**
+- [x] **5. Configurable LLM API engine & graceful offline fallback**
   Becomes usable: Optional settings drawer in `TopNavbar` to enter an OpenAI or Gemini API key (stored in `localStorage`) for live dynamic log synthesis, while preserving automatic fallback to offline demo data when offline or without a key.
   Why now: Proves real live AI extraction while keeping the application 100% resilient for demo recording and offline evaluation.
   PRD ref: `prd.md > States and Boundaries > API Failure / Fallback State`
