@@ -64,7 +64,13 @@ export const App: React.FC = () => {
     setHighlightedLineIndices(event.sourceLineIndices || []);
   };
 
+  const handleClearHighlight = () => {
+    setSelectedEventId(null);
+    setHighlightedLineIndices([]);
+  };
+
   const isDemoLoaded = rawLog === DEMO_RAW_LOG;
+  const selectedEvent = incident?.events.find(e => e.id === selectedEventId);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans">
@@ -86,6 +92,8 @@ export const App: React.FC = () => {
             onClear={handleClear}
             status={status}
             highlightedLineIndices={highlightedLineIndices}
+            selectedEventSummary={selectedEvent?.summary}
+            onClearHighlight={handleClearHighlight}
           />
         </section>
 

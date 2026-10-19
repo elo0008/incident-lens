@@ -9,7 +9,7 @@ Build mode: fast
 
 ## Slices
 
-- [ ] **1. Bootstrap project shell & render interactive timeline kernel with demo incident**
+- [x] **1. Bootstrap project shell & render interactive timeline kernel with demo incident**
   Becomes usable: A running dark-mode two-pane app where clicking "Load Demo Incident" loads the Flash Sale incident into the editor, clicking "Synthesize Timeline" runs the synthesis pipeline, and immediately renders the unique kernel: the Triage Efficiency ratio bar, the chronological milestone timeline with amber False Lead rabbit-hole cards (showing time lost), and the crimson Root Cause halo card.
   Why now: Proves the core value and unique kernel on day one—proves the scaffold, state, theme, data model, and rendering pipeline end-to-end so every subsequent feature builds on a working foundation.
   PRD ref: `prd.md > The Core Journey` (steps 1-4), `prd.md > Features and Behavior > 2. Timeline Synthesis & Rabbit Hole Detection`
@@ -61,7 +61,7 @@ Build mode: fast
 
 ## Hands-on Checkpoints
 
-- [ ] Early usable behavior explored — Slice 1 (core timeline kernel and demo incident synthesis running end-to-end)
+- [x] Early usable behavior explored — Slice 1 (core timeline kernel and demo incident synthesis running end-to-end)
 - [ ] Final kick-the-tires exploration and feedback completed
 
 ## Final Review
