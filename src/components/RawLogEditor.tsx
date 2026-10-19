@@ -111,12 +111,15 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
         </div>
       </div>
 
-      {/* Active Source Highlight Callout Banner */}
+      {/* Active Source Highlight Callout Banner - Enhanced padding, no overflow-hidden, relative flex orb */}
       {highlightedLineIndices.length > 0 && selectedEventSummary && (
-        <div className="px-3.5 py-2 bg-cyan-950/40 border-b border-cyan-500/30 text-xs font-mono text-cyan-300 flex items-center justify-between shrink-0 animate-fadeIn">
-          <div className="flex items-center space-x-2 truncate pr-2">
-            <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block shrink-0" />
-            <span className="font-semibold text-cyan-200">
+        <div className="px-3 py-1.5 bg-cyan-950/40 border-b border-cyan-500/30 text-xs font-mono text-cyan-300 flex items-center justify-between shrink-0 animate-fadeIn">
+          <div className="flex items-center min-w-0 pr-2">
+            <span className="relative flex h-2 w-2 shrink-0 mr-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+            </span>
+            <span className="font-semibold text-cyan-200 shrink-0 mr-1.5">
               Lines {highlightedLineIndices.map(n => n + 1).join(', ')}:
             </span>
             <span className="text-slate-300 truncate text-[11px]">
@@ -172,12 +175,12 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
               onScroll={handleTextareaScroll}
               disabled={status === 'loading'}
               placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr click "Load Demo Incident" in the header to load our 42-minute Flash Sale incident.`}
-              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto whitespace-pre selection:bg-cyan-500/30"
+              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto whitespace-pre-wrap break-words selection:bg-cyan-500/30"
               spellCheck={false}
             />
           </div>
         ) : (
-          /* Inspect View Mode: Single unified scroll container with inline rows */
+          /* Inspect View Mode: Single unified scroll container with whole-word wrapping (break-words) */
           <div className="w-full h-full overflow-y-auto py-3 bg-slate-950">
             {lines.map((line, idx) => {
               const isHighlighted = highlightedLineIndices.includes(idx);
@@ -200,7 +203,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                   >
                     {idx + 1}
                   </span>
-                  <span className="flex-1 whitespace-pre-wrap break-all">
+                  <span className="flex-1 whitespace-pre-wrap break-words text-left">
                     {line || ' '}
                   </span>
                 </div>
@@ -215,7 +218,9 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
         <div className="text-[11px] font-mono text-slate-400 flex items-center space-x-2">
           {highlightedLineIndices.length > 0 ? (
             <span className="text-cyan-400 flex items-center space-x-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              <span className="relative flex h-2 w-2 shrink-0 mr-1.5">
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-400"></span>
+              </span>
               <span>
                 Source linked ({highlightedLineIndices.length} {highlightedLineIndices.length === 1 ? 'line' : 'lines'})
               </span>
