@@ -62,7 +62,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
     }, 1200);
   };
 
-  const currentPreset = DEMO_PRESETS.find(p => p.id === activePresetId) || DEMO_PRESETS[0];
+  const currentPreset = activePresetId ? DEMO_PRESETS.find(p => p.id === activePresetId) : null;
 
   return (
     <>
@@ -118,7 +118,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             >
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
               <span className="hidden sm:inline font-mono font-semibold">Preset:</span>
-              <span className="text-slate-100">{currentPreset.name}</span>
+              <span className="text-slate-100">{currentPreset ? currentPreset.name : 'Select Scenario'}</span>
               <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 transition-transform ${isPresetMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
@@ -126,7 +126,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             {isPresetMenuOpen && (
               <div className="absolute right-0 mt-2 w-72 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl z-50 py-1.5 animate-fadeIn">
                 <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-mono uppercase text-slate-400 tracking-wider flex items-center justify-between">
-                  <span>Incident Scenarios</span>
+                  <span>Load Scenario Logs</span>
                   <span className="text-cyan-400">Offline Verified</span>
                 </div>
 

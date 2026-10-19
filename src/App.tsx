@@ -33,40 +33,23 @@ export const App: React.FC = () => {
     setActivePresetId(matchingPreset ? matchingPreset.id : null);
   };
 
-  // Instant preset switcher: loads raw logs + verified synthesis immediately
+  // Preset selector: populates raw logs into the left editor ONLY, resetting right pane to idle
   const handleSelectPreset = (presetId: string) => {
     const preset = DEMO_PRESETS.find((p) => p.id === presetId) || DEMO_PRESETS[0];
     setActivePresetId(preset.id);
     setRawLog(preset.rawLog);
-    setIncident(preset.synthesizedData);
-    setStatus('success');
-    setActiveMode('offline_verified');
+    // Explicitly reset right pane to idle (do not trigger synthesis)
+    setIncident(null);
+    setStatus('idle');
     setWarningMessage(null);
-
-    // Auto-select false lead milestone to display kernel immediately
-    const falseLeadEvent = preset.synthesizedData.events.find((e) => e.type === 'FALSE_LEAD');
-    if (falseLeadEvent) {
-      setSelectedEventId(falseLeadEvent.id);
-      setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
-    } else {
-      setSelectedEventId(null);
-      setHighlightedLineIndices([]);
-    }
+    setSelectedEventId(null);
+    setHighlightedLineIndices([]);
+    setViewMode('timeline');
   };
 
   // Legacy demo loader fallback
-  const handleLoadDemo = (autoSynthesize = true) => {
-    if (autoSynthesize) {
-      handleSelectPreset('flash_sale');
-    } else {
-      setRawLog(DEMO_RAW_LOG);
-      setActivePresetId('flash_sale');
-      setWarningMessage(null);
-      setSelectedEventId(null);
-      setHighlightedLineIndices([]);
-      setIncident(null);
-      setStatus('idle');
-    }
+  const handleLoadDemo = () => {
+    handleSelectPreset('flash_sale');
   };
 
   const triggerSynthesisProcess = async (textToSynthesize?: string) => {
@@ -245,6 +228,8 @@ export const App: React.FC = () => {
             <EmptyStateBlueprint
               onLoadDemo={handleLoadDemo}
               onSelectPreset={handleSelectPreset}
+              hasLogsLoaded={rawLog.trim().length > 0}
+              lineCount={rawLog.split('\n').filter(Boolean).length}
             />
           )}
         </section>

@@ -225,6 +225,11 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                 Source linked ({highlightedLineIndices.length} {highlightedLineIndices.length === 1 ? 'line' : 'lines'})
               </span>
             </span>
+          ) : rawLog.trim().length > 0 ? (
+            <span className="text-cyan-300 font-mono text-[11px] flex items-center space-x-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping inline-block" />
+              <span>Ready for timeline synthesis • Click button to analyze</span>
+            </span>
           ) : (
             <span className="text-slate-500">Ready for timeline synthesis</span>
           )}
@@ -234,7 +239,13 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
           id="synthesize-btn"
           onClick={onSynthesize}
           disabled={status === 'loading' || rawLog.trim().length === 0}
-          className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 disabled:bg-slate-800 disabled:text-slate-500 disabled:cursor-not-allowed text-slate-950 font-semibold text-xs tracking-wide transition-all shadow-md shadow-cyan-950/50 hover:shadow-cyan-900/40"
+          className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-slate-950 font-semibold text-xs tracking-wide transition-all ${
+            status === 'loading'
+              ? 'bg-cyan-600 text-slate-950 cursor-wait'
+              : rawLog.trim().length > 0
+              ? 'bg-cyan-400 hover:bg-cyan-300 shadow-lg shadow-cyan-400/30 ring-2 ring-cyan-300/60 animate-pulse cursor-pointer'
+              : 'bg-slate-800 text-slate-500 cursor-not-allowed shadow-none'
+          }`}
         >
           {status === 'loading' ? (
             <>
