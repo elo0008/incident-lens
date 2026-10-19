@@ -29,7 +29,7 @@ Build mode: fast
   Learner check: Click the "Redis cache saturation" false lead node in the timeline, and verify that lines corresponding to `@alex: checking redis memory...` highlight on the left.
   Commit: `Add cross-pane node-to-source log line highlighting`
 
-- [ ] **3. Input validation, 3-stage progress pulse & error handling**
+- [x] **3. Input validation, 3-stage progress pulse & error handling**
   Becomes usable: Client-side regex pre-validation catches invalid or timestampless input with an inline warning banner; clicking synthesize activates an animated 3-stage progress pulse (*"Extracting messages..."* → *"Isolating root cause..."* → *"Assembling timeline..."*).
   Why now: Robustness and UX polish—prevents broken requests or confused user states and creates an engaging operational feel during synthesis.
   PRD ref: `prd.md > Features and Behavior > 1. Raw Log Ingestion & Validation`, `prd.md > States and Boundaries > Loading / In-Flight State`, `Input Error State`

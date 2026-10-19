@@ -3,10 +3,12 @@ import { TopNavbar } from './components/TopNavbar';
 import { RawLogEditor } from './components/RawLogEditor';
 import { EmptyStateBlueprint } from './components/EmptyStateBlueprint';
 import { TimelineView } from './components/TimelineView';
+import { PostmortemView } from './components/PostmortemView';
 import { LoadingPulse } from './components/LoadingPulse';
 import { DEMO_RAW_LOG, DEMO_SYNTHESIZED_DATA } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
 import { SynthesizedIncident, SynthesisStatus, TimelineEvent, ViewMode } from './types/incident';
+import { Clock, Copy, FileText, Check } from 'lucide-react';
 
 export const App: React.FC = () => {
   const [rawLog, setRawLog] = useState<string>('');
@@ -16,6 +18,7 @@ export const App: React.FC = () => {
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [highlightedLineIndices, setHighlightedLineIndices] = useState<number[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
+  const [copiedHeader, setCopiedHeader] = useState<boolean>(false);
 
   const handleRawLogChange = (newVal: string) => {
     setRawLog(newVal);
@@ -71,6 +74,7 @@ export const App: React.FC = () => {
     setWarningMessage(null);
     setSelectedEventId(null);
     setHighlightedLineIndices([]);
+    setViewMode('timeline');
   };
 
   const handleSelectEvent = (event: TimelineEvent) => {
@@ -81,6 +85,17 @@ export const App: React.FC = () => {
   const handleClearHighlight = () => {
     setSelectedEventId(null);
     setHighlightedLineIndices([]);
+  };
+
+  const handleCopyHeaderMarkdown = async () => {
+    if (!incident) return;
+    try {
+      await navigator.clipboard.writeText(incident.markdownReport);
+      setCopiedHeader(true);
+      setTimeout(() => setCopiedHeader(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy', err);
+    }
   };
 
   const isDemoLoaded = rawLog === DEMO_RAW_LOG;
@@ -117,11 +132,76 @@ export const App: React.FC = () => {
           {status === 'loading' ? (
             <LoadingPulse />
           ) : incident && status === 'success' ? (
-            <TimelineView
-              incident={incident}
-              selectedEventId={selectedEventId}
-              onSelectEvent={handleSelectEvent}
-            />
+            <div className="h-full flex flex-col overflow-hidden">
+              {/* Segmented View Mode Toggle Header */}
+              <div className="h-10 px-4 border-b border-slate-800 bg-slate-900 flex items-center justify-between shrink-0">
+                {/* Segmented Switcher */}
+                <div className="flex items-center space-x-1 p-0.5 rounded-lg bg-slate-950 border border-slate-800 text-xs font-mono">
+                  <button
+                    id="tab-timeline-view"
+                    onClick={() => setViewMode('timeline')}
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all ${
+                      viewMode === 'timeline'
+                        ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>Timeline View</span>
+                  </button>
+
+                  <button
+                    id="tab-postmortem-view"
+                    onClick={() => setViewMode('postmortem')}
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all ${
+                      viewMode === 'postmortem'
+                        ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 shadow-sm'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <FileText className="w-3.5 h-3.5" />
+                    <span>Postmortem Markdown</span>
+                  </button>
+                </div>
+
+                {/* Persistent Quick Copy Button */}
+                <button
+                  id="header-copy-markdown-btn"
+                  onClick={handleCopyHeaderMarkdown}
+                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-mono border transition-all ${
+                    copiedHeader
+                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                      : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-750'
+                  }`}
+                  title="Copy SRE Markdown Postmortem to clipboard"
+                >
+                  {copiedHeader ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      <span>Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Copy Markdown</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* View Container */}
+              <div className="flex-1 overflow-hidden">
+                {viewMode === 'timeline' ? (
+                  <TimelineView
+                    incident={incident}
+                    selectedEventId={selectedEventId}
+                    onSelectEvent={handleSelectEvent}
+                  />
+                ) : (
+                  <PostmortemView incident={incident} />
+                )}
+              </div>
+            </div>
           ) : (
             <EmptyStateBlueprint onLoadDemo={handleLoadDemo} />
           )}
