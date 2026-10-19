@@ -13,6 +13,9 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
   const [copiedJira, setCopiedJira] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
 
+  // Normalize literal \n strings to real newlines
+  const formattedMarkdown = (incident.markdownReport || '').replace(/\\n/g, '\n');
+
   const toggleCheck = (idx: number) => {
     setCheckedItems((prev) => ({
       ...prev,
@@ -22,7 +25,7 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
 
   const handleCopyMd = async () => {
     try {
-      await navigator.clipboard.writeText(incident.markdownReport);
+      await navigator.clipboard.writeText(formattedMarkdown);
       setCopiedMd(true);
       setTimeout(() => setCopiedMd(false), 2000);
     } catch (err) {
@@ -47,7 +50,7 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
   };
 
   const handleDownloadMd = () => {
-    const blob = new Blob([incident.markdownReport], { type: 'text/markdown;charset=utf-8;' });
+    const blob = new Blob([formattedMarkdown], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
@@ -198,9 +201,9 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
         )}
 
         {/* Full Markdown Postmortem Document */}
-        <div className="prose prose-invert prose-slate prose-headings:font-sans prose-headings:tracking-tight prose-h1:text-xl prose-h2:text-base prose-h2:border-b prose-h2:border-slate-800 prose-h2:pb-2 prose-h2:mt-6 prose-p:text-xs prose-p:leading-relaxed prose-li:text-xs prose-code:font-mono prose-code:text-[11px] prose-code:bg-slate-900 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-cyan-300 prose-table:text-xs prose-th:bg-slate-900 prose-th:px-3 prose-th:py-2 prose-th:text-slate-300 prose-td:px-3 prose-td:py-2 prose-td:border-b prose-td:border-slate-850">
+        <div className="prose prose-invert prose-cyan max-w-none text-slate-300 font-sans leading-relaxed prose-headings:font-sans prose-headings:tracking-tight prose-h1:text-xl prose-h2:text-base prose-h2:border-b prose-h2:border-slate-800 prose-h2:pb-2 prose-h2:mt-6 prose-p:text-xs prose-p:leading-relaxed prose-li:text-xs prose-code:font-mono prose-code:text-[11px] prose-code:bg-slate-900 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-cyan-300 prose-table:text-xs prose-th:bg-slate-900 prose-th:px-3 prose-th:py-2 prose-th:text-slate-300 prose-td:px-3 prose-td:py-2 prose-td:border-b prose-td:border-slate-850">
           <ReactMarkdown remarkPlugins={[remarkGfm]}>
-            {incident.markdownReport}
+            {formattedMarkdown}
           </ReactMarkdown>
         </div>
       </div>

@@ -157,7 +157,20 @@ function generateOfflineSynthesis(rawLog: string): SynthesizedIncident {
         owner: "@sre"
       }
     ],
-    markdownReport: `# Incident Postmortem: Custom Incident Stream\\n\\n**Duration:** 35 minutes (${startTime} – ${endTime})\\n\\n## Executive Summary\\nIncident resolved after isolating culprit and disproving initial triage rabbit hole.\\n\\n## Root Cause\\nTelemetry confirmed failure trigger at ${endTime}.\\n\\n## Remediation Items\\n- [P0] Deploy circuit-breaker\\n- [P1] Improve triage telemetry`
+    markdownReport: `# Incident Postmortem: Custom Incident Stream
+
+**Duration:** 35 minutes (${startTime} – ${endTime})
+
+## Executive Summary
+Incident resolved after isolating culprit and disproving initial triage rabbit hole.
+
+## Root Cause
+Telemetry confirmed failure trigger at ${endTime}.
+
+## Remediation Items
+- [P0] Deploy circuit-breaker
+- [P1] Improve triage telemetry
+`
   };
 }
 
