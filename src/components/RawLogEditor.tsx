@@ -175,7 +175,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
               onScroll={handleTextareaScroll}
               disabled={status === 'loading'}
               placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr click "Load Demo Incident" in the header to load our 42-minute Flash Sale incident.`}
-              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto whitespace-pre-wrap break-words selection:bg-cyan-500/30"
+              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto whitespace-pre-wrap break-words text-justify selection:bg-cyan-500/30"
               spellCheck={false}
             />
           </div>
@@ -203,7 +203,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                   >
                     {idx + 1}
                   </span>
-                  <span className="flex-1 whitespace-pre-wrap break-words text-left">
+                  <span className="flex-1 whitespace-pre-wrap break-words text-justify">
                     {line || ' '}
                   </span>
                 </div>
