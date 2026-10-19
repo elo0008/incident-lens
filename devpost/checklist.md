@@ -84,3 +84,6 @@ Activity mode: live app and editor with interactive `devpost/app-map.html` compa
 
 - Synchronized textarea vertical scroll with line-number gutter (`RawLogEditor.tsx`) using locked `leading-6` heights to eliminate visual misalignment when scrolling.
 - Extended 3-stage progress pulse pacing to 800ms per phase (total 2.4s) in `LoadingPulse.tsx` and `App.tsx` so synthesis phases are readable during video demonstration.
+- Fixed top-left source trace badge orb clipping by removing outer `overflow-hidden`, padding to `px-3 py-1.5`, and applying `relative flex h-2 w-2 shrink-0 mr-2` to prevent half-moon crop.
+- Enforced whole-word typography wrapping (`whitespace-pre-wrap break-words text-left`) across inspect code blocks and log outputs to prevent awkward mid-word breaks.
+
