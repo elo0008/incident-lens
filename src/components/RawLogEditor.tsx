@@ -27,8 +27,8 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
 }) => {
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const highlightedRef = useRef<HTMLDivElement | null>(null);
-  const gutterRef = useRef<HTMLDivElement | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const lineNumbersRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const lines = rawLog ? rawLog.split('\n') : [];
   const lineCount = lines.length;
@@ -51,10 +51,10 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
     }
   }, [rawLog]);
 
-  // Synchronize textarea vertical scroll with gutter in Edit mode
-  const handleTextareaScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
-    if (gutterRef.current) {
-      gutterRef.current.scrollTop = e.currentTarget.scrollTop;
+  // Direct scroll sync: mirror textarea scrollTop to line numbers gutter
+  const handleScroll = () => {
+    if (textareaRef.current && lineNumbersRef.current) {
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
     }
   };
 
@@ -150,10 +150,10 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
         {isEditing || lines.length === 0 ? (
           /* Editable Textarea Mode with synchronized gutter */
           <div className="flex w-full h-full overflow-hidden">
-            {/* Gutter Line Numbers */}
+            {/* Gutter Line Numbers - Synchronized lockstep with textarea */}
             <div
-              ref={gutterRef}
-              className="w-12 py-3 bg-slate-950/90 border-r border-slate-800/60 text-slate-600 select-none text-right pr-3 shrink-0 font-mono overflow-hidden"
+              ref={lineNumbersRef}
+              className="w-12 py-3 bg-slate-950/90 border-r border-slate-800/60 text-slate-600 select-none text-right pr-3 shrink-0 font-mono text-xs leading-6 overflow-hidden pointer-events-none"
             >
               {lines.length > 0 ? (
                 lines.map((_, i) => (
@@ -166,16 +166,16 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
               )}
             </div>
 
-            {/* Native Textarea */}
+            {/* Native Textarea with matching line height and horizontal overflow */}
             <textarea
               ref={textareaRef}
               id="raw-log-textarea"
               value={rawLog}
               onChange={(e) => onChange(e.target.value)}
-              onScroll={handleTextareaScroll}
+              onScroll={handleScroll}
               disabled={status === 'loading'}
-              placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr click "Load Demo Incident" in the header to load our 42-minute Flash Sale incident.`}
-              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto whitespace-pre-wrap break-words text-justify selection:bg-cyan-500/30"
+              placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr select a scenario preset from the top navbar to load verified incident logs.`}
+              className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto overflow-x-auto whitespace-pre selection:bg-cyan-500/30"
               spellCheck={false}
             />
           </div>
