@@ -19,7 +19,7 @@ Build mode: fast
   Learner check: Open `http://localhost:5173`, click "Load Demo Incident", click "Synthesize Timeline", and inspect the high-density dark mode, triage efficiency bar, and amber false lead callout.
   Commit: `Initialize IncidentLens and render core timeline kernel with false leads`
 
-- [ ] **2. Source traceability & cross-pane log line highlighting**
+- [x] **2. Source traceability & cross-pane log line highlighting**
   Becomes usable: Clicking any milestone card in the timeline instantly highlights the exact source line(s) in the left raw log editor and scrolls them into view.
   Why now: High-priority SRE trust requirement—lets engineers immediately audit the AI's inferences against the raw chaotic logs.
   PRD ref: `prd.md > Features and Behavior > 3. Source Traceability`
