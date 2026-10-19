@@ -74,13 +74,14 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 
 ### 5. Honest Analysis & Verifiable Traceability (Slice 6)
 - As an SRE or evaluator testing IncidentLens, I want guaranteed truth in advertising and strict verification so that custom logs are never given fabricated output and every milestone is genuinely traced to source lines.
-  - [ ] **Sample Mode Boundary:** When no API key is provided, the app operates strictly in "Sample mode" and analyzes ONLY the built-in sample incidents. Pasting any unrecognized/custom log displays an inline amber warning banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."* Synthesis is blocked immediately—no timeline is generated and no loading card is shown.
+  - [ ] **Sample Mode Boundary:** When no API key is provided, the app operates strictly in "Sample mode" and analyzes ONLY the built-in sample incidents. Pasting any unrecognized/custom log displays an inline amber warning banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add a Gemini API key in Settings (gear icon)."* Synthesis is blocked immediately—no timeline is generated and no loading card is shown.
   - [ ] **Removal of Synthetic Generator:** The generic offline synthesizer that invented arbitrary events for custom logs is permanently removed (superseding the earlier "Deterministic Offline Fallback" decision).
-  - [ ] **Explicit API Error Surfaces:** A failed live API call displays a specific, informative error message (bad key, rate limit, network failure, or invalid JSON). It never silently falls back to canned or invented data.
+  - [ ] **Explicit API Error Surfaces (Google Gemini):** Live analysis uses Google Gemini REST API (`generateContent` with a free-tier key from Google AI Studio; OpenAI support is removed). Invalid key (400/403), quota exhaustion (429), model-not-found (404), network/CORS errors, and blocked/empty responses each display a specific, informative error message and never produce a timeline or silently fall back to canned data.
+  - [ ] **Settings Modal Privacy Disclaimer:** The settings modal warns that free-tier Gemini API requests may be used by Google to improve its products, advising users not to paste confidential or proprietary logs.
   - [ ] **Numbered Line Prompting & Verification Engine:** The live AI prompt numbers each log line and instructs the model to cite exact line numbers for each event. A verification step verifies every milestone: cited line numbers must exist in the raw log, and the milestone timestamp must match a cited line within 1 minute.
   - [ ] **Deterministic Metric Calculation:** Time lost for false leads and overall triage efficiency ratios are calculated directly from verified milestone timestamps, rather than taken blindly from model text.
   - [ ] **Grounded Traceability Badge:** The UI displays a live verification badge: `N/M milestones traced to log lines` computed by the verify step. The old generic `[Audit Ready]` wording is retired.
-  - [ ] **Engine Badge Accuracy & UI Cleanup:** Engine badge explicitly shows one of three states: *"Sample mode"*, *"Live AI ready"*, or *"Live AI"*. The obsolete `"v0.1.0-poc"` tag is removed. The Gemini provider option is removed from Settings to reflect the active OpenAI implementation.
+  - [ ] **Engine Badge Accuracy & UI Cleanup:** Engine badge explicitly shows one of three states: *"Sample mode"*, *"Live AI ready"*, or *"Live AI"*. The obsolete `"v0.1.0-poc"` tag is removed. Configuration is streamlined strictly to Gemini.
   - [ ] **Left-Aligned Inspect View:** RawLogEditor inspect view enforces `text-left` alignment (retiring `text-justify`) for clean monospace log scanning.
   - [ ] **Plain-English Intro Banner:** A one-line plain-English explainer sits above the two panes until an incident synthesis result is actively displayed on screen.
 
@@ -90,8 +91,8 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 - **Loading / In-Flight State:** Left textarea is locked. "Synthesize Timeline" button displays spinning indicator. Right pane shows active 3-stage progress pulse with clear descriptive steps.
 - **Success State:** Timeline renders fully populated with summary metrics, interactive nodes, and active view switcher.
 - **Input Error State:** If text is invalid (under 3 lines or zero timestamps), displays a clear amber warning banner above the left pane: *"Unable to detect chronological timestamps. Please include timestamps (e.g., 14:02 UTC) or load a sample incident."* Raw text is preserved; no API call is triggered.
-- **Sample Mode Custom Log Boundary State:** In Sample mode (no API key), pasting custom logs displays an amber banner directing the user to add an OpenAI API key in Settings, with no loading pulse or fake timeline generation.
-- **API Failure State:** If a live LLM request fails (bad key, 429 rate limit, network down, invalid JSON), displays a specific diagnostic error banner explaining the exact failure. It never silently falls back to canned data.
+- **Sample Mode Custom Log Boundary State:** In Sample mode (no API key), pasting custom logs displays an amber banner directing the user to add a Gemini API key in Settings, with no loading pulse or fake timeline generation.
+- **API Failure State:** If a live Gemini request fails (invalid key, 429 quota exhaustion, 404 model-not-found, network/CORS error, blocked/empty response, or invalid JSON), displays a specific diagnostic error banner explaining the exact failure. It never produces a timeline or silently falls back to canned data.
 
 ## Product Decisions
 - **Two-Pane Fixed Layout:** Chosen over a multi-page or wizard flow to keep the input logs and synthesized output directly visible side-by-side.
@@ -102,9 +103,14 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 ## Decision Log
 
 ### Oct 19, 2026 — Honest Analysis Over Fabricated Fallbacks
-- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an OpenAI API key, or with an invalid key.
+- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an API key, or with an invalid key.
 - **Decision:** Remove the generic offline synthesizer that invented arbitrary events for custom logs, and restrict Sample mode strictly to the built-in sample incidents. When a live API call fails, display the specific error rather than silently falling back to canned data.
 - **Reasoning:** Fabricating synthetic events for arbitrary logs directly contradicts IncidentLens's core promise—that every milestone is genuinely grounded in the source log. Grounding verification and truthful failure modes build authentic engineering trust.
+
+### Oct 19, 2026 — Switch Live Analysis Provider to Google Gemini (Free Tier)
+- **Context:** The project has no OpenAI API credits, making it impossible for the author to test and verify the live analysis pathway.
+- **Decision:** Switch live dynamic analysis to Google Gemini (REST `generateContent` with free-tier keys from Google AI Studio). OpenAI support is removed entirely rather than kept alongside. Update sample-mode guidance and settings to refer to Gemini API keys, and add a clear privacy warning in settings that Google AI Studio free-tier requests may be used by Google to improve its products.
+- **Risk Note & 2-Hour Timebox:** If live Gemini calls cannot be made to work directly from the browser within a 2-hour timebox (due to CORS, endpoint, or environment limitations), the project will ship strictly in sample-only mode and state so honestly in the README and hackathon submission.
 
 ## What We're Building
 - Single-page React/Vite/Tailwind dashboard with two-pane layout.

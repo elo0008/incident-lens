@@ -33,7 +33,7 @@ PRD ref: `prd.md > The Core Journey`, `prd.md > Look and Feel`.
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) (`^3.4`) + [@tailwindcss/typography](https://tailwindcss.com/docs/typography-plugin). *Rationale:* Clean utility classes for high-density slate-950 dark mode, custom scrollbars, and markdown rendering.
 - **Iconography:** [lucide-react](https://lucide.dev/) (`^0.475`). *Rationale:* Crisp, modern developer tool icons (AlertTriangle, Check, Copy, Terminal, Clock, RefreshCw, Cpu, Layers).
 - **Markdown Previewer:** [react-markdown](https://github.com/remarkjs/react-markdown) + [remark-gfm](https://github.com/remarkjs/remark-gfm). *Rationale:* Standard GitHub-flavored markdown parsing (tables, task lists, code blocks) in pure React.
-- **AI / LLM Integration:** Client-side fetch using standard OpenAI-compatible completions API with `response_format: { type: "json_object" }` or Google Gemini API. *Rationale:* Direct client-side invocation with zero backend requirement.
+- **AI / LLM Integration:** Client-side fetch using Google Gemini REST API (`https://generativelanguage.googleapis.com/v1beta/models/...:generateContent`) with `responseMimeType: "application/json"`. OpenAI support removed. *Rationale:* Free tier available via Google AI Studio without upfront credits, enabling live testing by the author.
 - **Offline Fallback Engine:** Built-in TypeScript module (`src/data/demoIncident.ts`). *Rationale:* Guarantees zero latency and 100% demo resilience.
 
 ## Where It Runs and How Someone Tries It
@@ -187,11 +187,12 @@ incident-lens/
 ```
 
 ## External Services and Dependencies
-- **OpenAI Completion Endpoint (Optional for Custom Logs):**
-  - Endpoint: Standard chat completions (`https://api.openai.com/v1/chat/completions`)
-  - Model: Default `gpt-4o-mini`
-  - Payload: Numbered raw incident text (`[L1] ...`) with JSON schema instructions requesting explicit line citations for every milestone.
-  - Response format: Strict JSON object.
+- **Google Gemini Endpoint (Optional for Custom Logs):**
+  - Endpoint: Google AI Studio REST `generateContent` (`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={apiKey}`)
+  - Model: `gemini-1.5-flash`
+  - Payload: Numbered raw incident text (`[L1] ...`) with system prompt and JSON schema instructions requesting explicit line citations for every milestone.
+  - Response format: Strict JSON object enforced via `generationConfig.responseMimeType = "application/json"`.
+  - Authentication: Free-tier API key from Google AI Studio. OpenAI support is completely removed.
 
 ## Slice 6: Honest Analysis and Verification
 
@@ -199,19 +200,25 @@ incident-lens/
 - When no API key is present (`settings.apiKey` is empty), the application operates in **Sample mode**.
 - Synthesis is permitted ONLY for the 2 built-in sample incidents (Flash Sale 504s and Database Deadlock).
 - Any custom or unrecognized log text triggers an immediate inline amber warning banner in the editor:
-  `"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."`
+  `"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add a Gemini API key in Settings (gear icon)."`
 - Execution halts immediately: no loading card is shown and no timeline is generated.
 
 ### 2. Removal of Generic Synthetic Offline Generator
 - The arbitrary generator function (`generateOfflineSynthesis`), which previously invented fictional milestones for unrecognized logs, is completely removed.
 - This supersedes the earlier design decision *"Deterministic Offline Fallback"*.
 
-### 3. Explicit API Error Surfaces
-- When a live AI request fails, the application captures and surfaces the specific error reason directly to the user (e.g., *Invalid API Key*, *Rate Limit Exceeded [HTTP 429]*, *Network Unavailable*, or *Malformed JSON Response*).
-- The system never silently falls back to canned or invented data upon a live API failure.
+### 3. Explicit API Error Surfaces (Google Gemini)
+- When a live Gemini request fails, the application captures and surfaces the specific error reason directly to the user:
+  - *Invalid API Key* (HTTP 400 / 403 API key rejected)
+  - *Quota Exhaustion* (HTTP 429 rate limit or daily quota reached)
+  - *Model Not Found* (HTTP 404 endpoint/model identifier error)
+  - *Network / CORS Unavailable* (client-side connection or CORS block)
+  - *Blocked / Empty Response* (safety blocks or empty candidate list from Gemini)
+  - *Malformed JSON Response* (invalid schema or non-parseable payload)
+- A failed live call never produces a timeline and never silently falls back to canned or invented data.
 
 ### 4. Line Numbered Prompting & Verification Engine
-- **Prompt Enhancement:** Before sending the raw log to OpenAI, lines are indexed and prepended with explicit line tags (`[L1]`, `[L2]`, ...). The prompt directs the model to cite the exact line numbers (e.g. `citedLines: [14, 15]`) for every extracted event.
+- **Prompt Enhancement:** Before sending the raw log to Gemini, lines are indexed and prepended with explicit line tags (`[L1]`, `[L2]`, ...). The prompt directs the model to cite the exact line numbers (e.g. `citedLines: [14, 15]`) for every extracted event.
 - **Verification Engine (`verifyMilestones`):**
   - Iterates over each event produced by the model.
   - Verifies that every cited line exists in the original log.
@@ -227,7 +234,9 @@ incident-lens/
   1. `"Sample mode"` (no API key configured)
   2. `"Live AI ready"` (valid API key stored in settings)
   3. `"Live AI"` (synthesis produced via live model response)
-- Settings drawer removes the Gemini model selector option, streamlining configuration strictly to OpenAI.
+- Settings modal configuration is streamlined strictly to Google Gemini (free-tier key; OpenAI is removed).
+- The settings modal includes an explicit data privacy notice:
+  *"Notice: Google AI Studio free-tier requests may be logged and used by Google to improve products. Do not paste confidential or proprietary logs."*
 - The obsolete `"v0.1.0-poc"` chip in the header is removed.
 
 ### 7. Left-Aligned Inspect View Typography
@@ -241,12 +250,14 @@ incident-lens/
 - **Input without timestamps or < 3 lines:** Client-side validator halts before network call; displays warning banner in `RawLogEditor`.
 - **Sample Mode with Custom Logs:** Client-side matcher detects unindexed log; halts and displays amber guidance banner directing user to Settings.
 - **API Network error or Rate Limit (429/500):** Surfaces specific diagnostic error alert; halts execution without silent canned data substitution.
+- **Gemini Safety Block or Empty Candidates:** Surfaces specific diagnostic alert that content was blocked or empty; halts execution without producing a timeline.
 - **Malformed JSON from LLM:** Error handler surfaces explicit JSON parse failure and prompts for retry.
 
 ## What Was Simplified and Why
 - **Sample Mode for Built-In Incidents Only:** Keeps the app 100% dependable for demo evaluations without risking fabricated inferences for unverified user logs.
-- **Direct OpenAI Integration:** Eliminates multi-provider complexity that was not backed by production endpoints.
+- **Direct Google Gemini Integration:** Uses Google AI Studio free tier so live analysis can be tested without paid credits. OpenAI integration is removed.
 - **Client-Side Verification Step:** Guarantees auditability mathematically before presenting data to the user.
+- **Risk Note & 2-Hour Timebox:** If browser-direct calls to the Gemini API cannot be made to work within a 2-hour timebox (due to CORS, endpoint, or environment limitations), the project will ship strictly in sample-only mode and state so transparently in the README and Devpost submission.
 
 ## Decisions and Open Issues
 
@@ -262,4 +273,10 @@ incident-lens/
 - **Context:** Earlier drafts planned three demo presets (including a proposed Kafka consumer lag scenario).
 - **Decision:** Cut the Kafka scenario and ship strictly 2 built-in sample incidents (`flash_sale` and `db_deadlock`).
 - **Reasoning:** Sizing down to two realistic, fully grounded scenarios guarantees 100% auditability and source line traceability without inflating maintenance surface.
+
+### Decision Log — Oct 19, 2026: Switch Live Analysis Provider to Google Gemini (Free Tier)
+- **Context:** The project has zero OpenAI API credits, making it impossible for the author to test and demonstrate live dynamic incident synthesis.
+- **Decision:** Switch live analysis provider exclusively to Google Gemini (REST `generateContent` via Google AI Studio free tier). OpenAI support is removed, not kept alongside. Sample-mode guidance and settings modal are updated to refer to Gemini API keys, with an explicit privacy disclaimer regarding free-tier data logging.
+- **Risk Note & 2-Hour Timebox:** If live Gemini calls cannot be made to work directly from the browser within a 2-hour timebox, the project will ship in sample-only mode and say so honestly in the README and submission.
+
 

@@ -65,16 +65,17 @@ Build mode: fast
   PRD ref: `prd.md > Features and Behavior > 5. Honest Analysis & Verifiable Traceability (Slice 6)`, `prd.md > Decision Log`
   Spec ref: `spec.md > Slice 6: Honest Analysis and Verification`, `spec.md > Decisions and Open Issues`
   Build:
-    - [ ] Sample mode boundary: When no API key is present, analyze ONLY the 2 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
+    - [ ] Sample mode boundary: When no API key is present, analyze ONLY the 2 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add a Gemini API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
     - [ ] Remove the generic offline synthesizer that invents events for arbitrary logs (superseding "Deterministic Offline Fallback").
-    - [ ] Surface specific error diagnostics for live API failures (bad key, rate limit, network, invalid JSON) with zero silent fallback to canned data.
+    - [ ] Surface specific error diagnostics for live Gemini API failures (invalid key, 429 quota exhaustion, 404 model-not-found, network/CORS, blocked/empty response, invalid JSON) with zero silent fallback to canned data.
     - [ ] Live prompt numbers log lines and instructs the model to cite line numbers; add verify step checking that cited lines exist and milestone timestamp matches a cited line within 1 minute; compute false lead time lost and triage ratio deterministically from timestamps.
     - [ ] Update UI to display `"N/M milestones traced to log lines"` computed by verify step, retiring the old `[Audit Ready]` wording.
-    - [ ] Update engine badge states: `"Sample mode"`, `"Live AI ready"`, `"Live AI"`; remove Gemini option from settings; remove `"v0.1.0-poc"` chip.
+    - [ ] Update engine badge states: `"Sample mode"`, `"Live AI ready"`, `"Live AI"`; streamline settings exclusively to Gemini (remove OpenAI); add free-tier privacy warning to settings modal; remove `"v0.1.0-poc"` chip.
     - [ ] Update RawLogEditor inspect view to use `text-left` instead of `text-justify`.
     - [ ] Add a one-line plain-English intro banner above the two panes until an incident result is on screen.
-  Verify (mechanical): Run `npm run build` with zero errors; test custom log in Sample mode to verify amber banner blocks synthesis; test live API error surfacing without silent fallback; verify line citation and timestamp matching logic; confirm badge reads "N/M milestones traced to log lines" and inspect view is text-left.
-  Learner check: Paste a custom log in Sample mode, observe amber banner; switch to a preset and verify "N/M milestones traced to log lines"; check engine badge states.
+    - [ ] Run one unseen log through live mode and confirm milestones highlight correct lines
+  Verify (mechanical): Run `npm run build` with zero errors; test custom log in Sample mode to verify amber banner blocks synthesis; test live Gemini API error surfacing without silent fallback; verify line citation and timestamp matching logic; confirm badge reads "N/M milestones traced to log lines" and inspect view is text-left.
+  Learner check: Paste a custom log in Sample mode, observe amber banner; switch to a preset and verify "N/M milestones traced to log lines"; check engine badge states; verify live Gemini synthesis with free-tier key.
   Commit: `feat: implement honest analysis, verification step, and sample mode boundaries (Slice 6)`
 
 ## Hands-on Checkpoints
@@ -111,8 +112,14 @@ Activity mode: live app and editor with interactive `devpost/app-map.html` compa
 ## Decision Log
 
 ### Oct 19, 2026 — Honest Analysis and Grounding Verification (Slice 6)
-- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an OpenAI API key, or with an invalid key.
+- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an API key, or with an invalid key.
 - **Decision:** Remove the generic offline synthesizer that invented arbitrary events for custom logs, and restrict Sample mode strictly to the built-in sample incidents. Require an API key for custom logs, explicitly surface API errors without silent fallback, and deterministically verify all cited line numbers and timestamps.
 - **Reasoning:** Fabricating synthetic events for arbitrary logs directly contradicts IncidentLens's core promise—that every single milestone is rigorously grounded in and auditable against the source log. Grounding verification and truthful error boundaries build authentic engineering trust.
+
+### Oct 19, 2026 — Switch Live Analysis Provider to Google Gemini (Free Tier)
+- **Context:** The project has zero OpenAI API credits, making it impossible for the author to test and demonstrate live dynamic incident synthesis.
+- **Decision:** Switch live analysis provider exclusively to Google Gemini (REST `generateContent` via Google AI Studio free tier). OpenAI support is removed, not kept alongside. Sample-mode guidance and settings modal are updated to refer to Gemini API keys, with an explicit privacy disclaimer regarding free-tier data logging.
+- **Risk Note & 2-Hour Timebox:** If live Gemini calls cannot be made to work directly from the browser within a 2-hour timebox, the project will ship in sample-only mode and say so honestly in the README and submission.
+
 
 
