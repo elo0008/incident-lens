@@ -5,7 +5,7 @@ import { EmptyStateBlueprint } from './components/EmptyStateBlueprint';
 import { TimelineView } from './components/TimelineView';
 import { PostmortemView } from './components/PostmortemView';
 import { LoadingPulse } from './components/LoadingPulse';
-import { DEMO_RAW_LOG } from './data/demoIncident';
+import { DEMO_RAW_LOG, DEADLOCK_RAW_LOG, DEMO_PRESETS } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
 import { getStoredAISettings, synthesizeIncidentLogs } from './services/synthesisService';
 import { SynthesizedIncident, SynthesisStatus, TimelineEvent, ViewMode } from './types/incident';
@@ -21,6 +21,7 @@ export const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [copiedHeader, setCopiedHeader] = useState<boolean>(false);
   const [activeMode, setActiveMode] = useState<'offline_verified' | 'live_ai'>('offline_verified');
+  const [selectedPresetId, setSelectedPresetId] = useState<'flash_sale' | 'db_deadlock'>('flash_sale');
 
   const handleRawLogChange = (newVal: string) => {
     setRawLog(newVal);
@@ -29,15 +30,37 @@ export const App: React.FC = () => {
     }
   };
 
+  // Switch scenario preset: instantly load raw logs and verified synthesis
+  const handleSelectPreset = (presetId: 'flash_sale' | 'db_deadlock') => {
+    setSelectedPresetId(presetId);
+    const preset = DEMO_PRESETS.find((p) => p.id === presetId) || DEMO_PRESETS[0];
+    setRawLog(preset.rawLog);
+    setWarningMessage(null);
+    setIncident(preset.synthesized);
+    setActiveMode('offline_verified');
+    setStatus('success');
+
+    // Auto-select false lead to immediately showcase the visual kernel
+    const falseLeadEvent = preset.synthesized.events.find((e) => e.type === 'FALSE_LEAD');
+    if (falseLeadEvent) {
+      setSelectedEventId(falseLeadEvent.id);
+      setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
+    } else {
+      setSelectedEventId(null);
+      setHighlightedLineIndices([]);
+    }
+  };
+
   // Load demo scenario into editor
   const handleLoadDemo = (autoSynthesize = false) => {
-    setRawLog(DEMO_RAW_LOG);
+    const preset = DEMO_PRESETS.find((p) => p.id === selectedPresetId) || DEMO_PRESETS[0];
+    setRawLog(preset.rawLog);
     setWarningMessage(null);
     setSelectedEventId(null);
     setHighlightedLineIndices([]);
 
     if (autoSynthesize) {
-      triggerSynthesisProcess(DEMO_RAW_LOG);
+      triggerSynthesisProcess(preset.rawLog);
     }
   };
 
@@ -108,7 +131,8 @@ export const App: React.FC = () => {
     }
   };
 
-  const isDemoLoaded = rawLog === DEMO_RAW_LOG;
+  const isDemoLoaded =
+    rawLog.trim() === DEMO_RAW_LOG.trim() || rawLog.trim() === DEADLOCK_RAW_LOG.trim();
   const selectedEvent = incident?.events.find((e) => e.id === selectedEventId);
 
   return (
@@ -116,6 +140,8 @@ export const App: React.FC = () => {
       {/* Top Navbar */}
       <TopNavbar
         onLoadDemo={handleLoadDemo}
+        onSelectPreset={handleSelectPreset}
+        selectedPresetId={selectedPresetId}
         status={status}
         isDemoLoaded={isDemoLoaded}
         activeMode={activeMode}
@@ -175,26 +201,22 @@ export const App: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Persistent Quick Copy Button */}
+                {/* Quick Copy Markdown Action */}
                 <button
                   id="header-copy-markdown-btn"
                   onClick={handleCopyHeaderMarkdown}
-                  className={`flex items-center space-x-1.5 px-2.5 py-1 rounded text-xs font-mono border transition-all ${
-                    copiedHeader
-                      ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                      : 'bg-slate-800/80 hover:bg-slate-800 text-slate-300 border-slate-750'
-                  }`}
-                  title="Copy SRE Markdown Postmortem to clipboard"
+                  className="flex items-center space-x-1 text-xs font-mono text-slate-400 hover:text-slate-200 px-2 py-1 rounded hover:bg-slate-800 transition-colors"
+                  title="Copy full postmortem markdown"
                 >
                   {copiedHeader ? (
                     <>
-                      <Check className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Copied!</span>
+                      <Check className="w-3 h-3 text-emerald-400" />
+                      <span className="text-emerald-400">Copied!</span>
                     </>
                   ) : (
                     <>
-                      <Copy className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Copy Markdown</span>
+                      <Copy className="w-3 h-3" />
+                      <span className="hidden sm:inline">Copy Postmortem</span>
                     </>
                   )}
                 </button>
@@ -214,7 +236,7 @@ export const App: React.FC = () => {
               </div>
             </div>
           ) : (
-            <EmptyStateBlueprint onLoadDemo={handleLoadDemo} />
+            <EmptyStateBlueprint onLoadDemo={() => handleLoadDemo(true)} />
           )}
         </section>
       </main>

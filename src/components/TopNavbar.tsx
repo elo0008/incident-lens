@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Activity,
   Check,
-  Clock,
+  ChevronDown,
+  Database,
   Key,
+  Layers,
   Settings,
   ShieldCheck,
   Sparkles,
@@ -13,9 +15,12 @@ import {
 } from 'lucide-react';
 import { SynthesisStatus } from '../types/incident';
 import { AISettings, getStoredAISettings, saveAISettings } from '../services/synthesisService';
+import { DEMO_PRESETS } from '../data/demoIncident';
 
 interface TopNavbarProps {
   onLoadDemo: () => void;
+  onSelectPreset: (presetId: 'flash_sale' | 'db_deadlock') => void;
+  selectedPresetId: 'flash_sale' | 'db_deadlock';
   status: SynthesisStatus;
   isDemoLoaded: boolean;
   activeMode: 'offline_verified' | 'live_ai';
@@ -23,13 +28,28 @@ interface TopNavbarProps {
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   onLoadDemo,
+  onSelectPreset,
+  selectedPresetId,
   status,
   isDemoLoaded,
   activeMode
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState<boolean>(false);
   const [settings, setSettings] = useState<AISettings>(getStoredAISettings);
   const [savedNotice, setSavedNotice] = useState<boolean>(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsPresetDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +60,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       setIsSettingsOpen(false);
     }, 1200);
   };
+
+  const currentPreset = DEMO_PRESETS.find(p => p.id === selectedPresetId) || DEMO_PRESETS[0];
 
   return (
     <>
@@ -84,19 +106,85 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
         {/* Action Controls */}
         <div className="flex items-center space-x-2.5">
+          {/* Multi-Scenario Preset Selector Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              id="navbar-preset-dropdown-btn"
+              onClick={() => setIsPresetDropdownOpen(!isPresetDropdownOpen)}
+              disabled={status === 'loading'}
+              className="flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md border bg-slate-800/90 border-slate-700 hover:border-cyan-500/50 text-slate-200 transition-all shadow-sm"
+              title="Select incident scenario preset"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="hidden sm:inline font-mono text-[11px] text-cyan-300">Preset:</span>
+              <span className="font-semibold text-slate-100">{currentPreset.title}</span>
+              <ChevronDown
+                className={`w-3.5 h-3.5 text-slate-400 transition-transform ${
+                  isPresetDropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {isPresetDropdownOpen && (
+              <div className="absolute right-0 mt-2 w-80 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl p-2 z-30 animate-fadeIn space-y-1.5">
+                <div className="px-2.5 py-1 text-[10px] font-mono text-slate-400 uppercase tracking-wider flex items-center justify-between border-b border-slate-800/80 pb-1.5">
+                  <span>Verified SRE Scenarios</span>
+                  <span className="text-cyan-400">Deterministic</span>
+                </div>
+                {DEMO_PRESETS.map((preset) => {
+                  const isSelected = selectedPresetId === preset.id;
+                  const Icon = preset.id === 'flash_sale' ? Layers : Database;
+                  return (
+                    <button
+                      key={preset.id}
+                      onClick={() => {
+                        onSelectPreset(preset.id);
+                        setIsPresetDropdownOpen(false);
+                      }}
+                      className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-start space-x-2.5 ${
+                        isSelected
+                          ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-200 shadow-sm'
+                          : 'bg-slate-950/40 border-slate-800 hover:bg-slate-800/80 hover:border-slate-700 text-slate-300'
+                      }`}
+                    >
+                      <div
+                        className={`p-1.5 rounded-md mt-0.5 shrink-0 ${
+                          isSelected
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+                            : 'bg-slate-800 text-slate-400 border border-slate-700'
+                        }`}
+                      >
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-slate-100">{preset.title}</span>
+                          {isSelected && <Check className="w-3.5 h-3.5 text-cyan-400 shrink-0 ml-1" />}
+                        </div>
+                        <p className="text-[11px] text-slate-400 mt-0.5 leading-snug">
+                          {preset.subtitle}
+                        </p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Quick Re-load Demo Button */}
           <button
             id="navbar-load-demo-btn"
             onClick={onLoadDemo}
             disabled={status === 'loading'}
-            className={`flex items-center space-x-2 text-xs font-medium px-3 py-1.5 rounded-md border transition-all ${
+            className={`hidden sm:flex items-center space-x-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md border transition-all ${
               isDemoLoaded
-                ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700'
+                ? 'bg-slate-800/80 border-slate-700 text-slate-300 hover:bg-slate-700'
                 : 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300 hover:bg-cyan-500/20 shadow-sm shadow-cyan-950/40'
             }`}
-            title="Load pre-built realistic 40+ line Payment Gateway 504 outage log"
+            title="Reload current scenario into the raw editor"
           >
-            <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Load Demo Incident</span>
+            <span>Reload</span>
           </button>
 
           {/* Settings Trigger */}
@@ -129,7 +217,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               </div>
               <button
                 onClick={() => setIsSettingsOpen(false)}
-                className="text-slate-400 hover:text-slate-200 p-1 rounded"
+                className="text-slate-500 hover:text-slate-300 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -137,53 +225,67 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">
-                  OpenAI-Compatible API Key (Optional)
+                <label className="block text-xs font-mono text-slate-300 mb-1.5">
+                  LLM Provider
+                </label>
+                <select
+                  value={settings.provider}
+                  onChange={(e) =>
+                    setSettings({ ...settings, provider: e.target.value as 'openai' | 'gemini' })
+                  }
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500"
+                >
+                  <option value="openai">OpenAI (ChatCompletions API)</option>
+                  <option value="gemini">Google Gemini (JSON Mode)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-mono text-slate-300 mb-1.5">
+                  API Key
                 </label>
                 <input
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  placeholder="sk-... (Leave empty for Offline Demo Mode)"
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
+                  placeholder="sk-... or AIzaSy... (Leave empty for Offline Demo)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Keys are stored exclusively in your local browser storage. If empty, IncidentLens uses the deterministic offline fallback engine.
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Stored securely in your browser's localStorage. Zero server tracking.
                 </p>
               </div>
 
               <div>
-                <label className="block text-xs font-mono text-slate-300 mb-1">Model</label>
-                <select
+                <label className="block text-xs font-mono text-slate-300 mb-1.5">
+                  Model Identifier
+                </label>
+                <input
+                  type="text"
                   value={settings.model}
                   onChange={(e) => setSettings({ ...settings, model: e.target.value })}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="gpt-4o-mini">gpt-4o-mini (Fast & Structured)</option>
-                  <option value="gpt-4o">gpt-4o</option>
-                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
-                </select>
+                  placeholder="gpt-4o-mini or gemini-1.5-pro"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-cyan-500 font-mono"
+                />
               </div>
 
-              <div className="pt-2 flex items-center justify-between">
-                <span className="text-xs text-emerald-400 font-mono">
-                  {savedNotice ? '✓ Saved settings!' : ''}
+              <div className="pt-2 flex items-center justify-between border-t border-slate-800">
+                <span className="text-[11px] font-mono text-cyan-400">
+                  {savedNotice && 'Settings saved!'}
                 </span>
-
-                <div className="flex items-center space-x-2">
+                <div className="flex space-x-2">
                   <button
                     type="button"
                     onClick={() => setIsSettingsOpen(false)}
-                    className="px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:text-slate-200"
+                    className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
-                    className="flex items-center space-x-1.5 px-4 py-1.5 rounded-lg bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs font-mono transition-colors"
+                    className="px-4 py-1.5 text-xs font-medium rounded-lg bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40 transition-colors shadow-sm"
                   >
-                    <Check className="w-3.5 h-3.5" />
-                    <span>Save Settings</span>
+                    Save Configuration
                   </button>
                 </div>
               </div>

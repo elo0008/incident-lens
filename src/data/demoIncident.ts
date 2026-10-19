@@ -183,3 +183,207 @@ Initial triage spent 18 minutes investigating an alleged Redis memory exhaustion
 - **[P2]** Add dedicated Datadog synthetic monitors for external API latency (\`@sre-observability\`)
 `
 };
+
+export const DEADLOCK_RAW_LOG = `[09:15:02] @datadog-bot: ALERT [P1] - Postgres Primary CPU at 98%, active connection count 1,980 / 2,000 max_connections
+[09:15:35] @datadog-bot: ALERT [P1] - API Gateway HTTP 500 error rate spiked to 23.4% on /api/v2/transactions/commit
+[09:16:10] @elena_oncall: Acknowledging P1. Traffic volume spiked from 12k req/sec to 45k req/sec in 90 seconds.
+[09:17:05] @security_sam: Looking at Cloudflare edge logs. We're seeing thousands of concurrent POST requests with random user agents from suspicious ASN subnets. Could this be a Layer 7 DDoS attack?
+[09:18:40] @elena_oncall: That explains the huge traffic spike! Enabling Under Attack mode on Cloudflare edge.
+[09:20:15] @security_sam: Under Attack mode active. Challenge page enabled. But database active connections are still pinned at 2,000!
+[09:22:30] @security_sam: Inspecting firewall drop counters... We dropped 80% of edge requests, yet API 500s are increasing, not decreasing!
+[09:25:00] @security_sam: Digging into origin ingress... The traffic surge wasn't external hackers. It's legitimate client apps aggressively retrying failing transactions with zero exponential backoff!
+[09:27:10] @david_dba: Joining bridge. It is NOT a DDoS attack. Cloudflare drops had zero effect because the bottleneck is internal. We lost 14 minutes chasing DDoS.
+[09:28:45] @david_dba: Running pg_stat_activity query... Found 1,450 queries in 'idle in transaction' and 'exclusive lock' state waiting on PID 88412!
+[09:30:20] @david_dba: ROOT CAUSE ISOLATED: A background billing migration job executed 'ALTER TABLE user_balances ADD COLUMN tax_exempt_status' without SHARE UPDATE EXCLUSIVE lock. It took an ACCESS EXCLUSIVE lock, blocking all balance updates!
+[09:32:05] @elena_oncall: Who triggered that migration? It was supposed to run on the read-replica during the maintenance window!
+[09:33:40] @david_dba: Cancelling blocking PID 88412 now: pg_terminate_backend(88412).
+[09:35:15] @david_dba: Migration process killed. Waiting for Postgres transaction rollback to complete.
+[09:37:00] @david_dba: Rollback finished. Queue of 1,450 locked transactions flushed through.
+[09:38:20] @datadog-bot: RECOVERY - Postgres active connections returned to baseline (145 / 2,000)
+[09:40:05] @datadog-bot: RECOVERY - HTTP 500 error rate dropped to 0.01%
+[09:41:30] @elena_oncall: API latencies normal. Balance updates clearing without errors. Disabling Cloudflare Under Attack mode.
+[09:43:00] @elena_oncall: Incident resolved at 09:43 UTC. Total duration: 28 minutes. Initiating postmortem review.`;
+
+export const DEADLOCK_SYNTHESIZED_DATA: SynthesizedIncident = {
+  executiveSummary: {
+    title: "Database Lock Contention & Transaction Timeout Storm",
+    impact: "23.4% of checkout commit requests failed with HTTP 500 over a 28-minute outage window.",
+    ttdMinutes: 1,
+    ttrMinutes: 28,
+    triageTimeRatio: 0.50 // 14m lost out of 28m total
+  },
+  rootCause: {
+    summary: "An unscheduled background billing migration executed 'ALTER TABLE user_balances' without a non-blocking safety wrapper. It acquired an ACCESS EXCLUSIVE table lock, blocking 1,450 concurrent transactions and exhausting the Postgres 2,000-connection limit. Unchecked client retries compounded the storm.",
+    discoveredAt: "09:30 UTC",
+    discoveredBy: "@david_dba"
+  },
+  events: [
+    {
+      id: "evt-dl-1",
+      timestamp: "09:15 UTC",
+      author: "Datadog-Bot",
+      type: "CRITICAL_ALERT",
+      summary: "Postgres primary CPU hit 98% and active connection pool saturated (1,980/2,000).",
+      rawSnippet: "[09:15:02] @datadog-bot: ALERT [P1] - Postgres Primary CPU at 98%, active connection count 1,980 / 2,000",
+      timeLostMinutes: 0,
+      details: "HTTP 500 error rate spiked to 23.4% across payment and ledger commit routes.",
+      sourceLineIndices: [0, 1]
+    },
+    {
+      id: "evt-dl-2",
+      timestamp: "09:16 UTC",
+      author: "@elena_oncall",
+      type: "TRIAGE",
+      summary: "On-call acknowledges P1 outage; observes traffic volume surging from 12k to 45k req/sec.",
+      rawSnippet: "[09:16:10] @elena_oncall: Acknowledging P1. Traffic volume spiked from 12k req/sec to 45k req/sec in 90 seconds.",
+      timeLostMinutes: 0,
+      details: "Rapid surge prompted initial suspicions of sudden external traffic abuse.",
+      sourceLineIndices: [2]
+    },
+    {
+      id: "evt-dl-3",
+      timestamp: "09:17 UTC",
+      author: "@security_sam & @elena_oncall",
+      type: "FALSE_LEAD",
+      summary: "False Lead: Investigated external Layer 7 DDoS attack and enabled Cloudflare Under Attack mode.",
+      rawSnippet: "[09:17:05] @security_sam: Seeing thousands of concurrent POST requests... Could this be a Layer 7 DDoS attack?",
+      timeLostMinutes: 14,
+      details: "Team suspected volumetric Layer 7 DDoS attack and enabled aggressive edge challenge pages. Dropping 80% of traffic had zero impact on database lockup. Traffic burst was actually caused by internal client retries without jitter. 14 minutes lost.",
+      sourceLineIndices: [3, 4, 5, 6, 7, 8]
+    },
+    {
+      id: "evt-dl-4",
+      timestamp: "09:28 UTC",
+      author: "@david_dba",
+      type: "TRIAGE",
+      summary: "Database triage reveals 1,450 queries waiting on exclusive table lock behind PID 88412.",
+      rawSnippet: "[09:28:45] @david_dba: Running pg_stat_activity query... Found 1,450 queries in 'idle in transaction' waiting on PID 88412!",
+      timeLostMinutes: 0,
+      details: "Database telemetry conclusively moved diagnosis from edge network to internal locking contention.",
+      sourceLineIndices: [9]
+    },
+    {
+      id: "evt-dl-5",
+      timestamp: "09:30 UTC",
+      author: "@david_dba",
+      type: "ROOT_CAUSE",
+      summary: "Root Cause Isolated: Unscheduled ALTER TABLE migration acquired ACCESS EXCLUSIVE lock on user_balances.",
+      rawSnippet: "[09:30:20] @david_dba: ROOT CAUSE ISOLATED: A background billing migration job executed 'ALTER TABLE user_balances...'",
+      timeLostMinutes: 0,
+      details: "Migration ran without zero-downtime safety wrappers, locking all read/write balance transactions.",
+      sourceLineIndices: [10, 11]
+    },
+    {
+      id: "evt-dl-6",
+      timestamp: "09:33 UTC",
+      author: "@david_dba",
+      type: "MITIGATION",
+      summary: "Mitigation: Terminated blocking PID 88412 and rolled back migration transaction.",
+      rawSnippet: "[09:33:40] @david_dba: Cancelling blocking PID 88412 now: pg_terminate_backend(88412).",
+      timeLostMinutes: 0,
+      details: "Terminated query process and allowed lock queue to clear gracefully without corrupting state.",
+      sourceLineIndices: [12, 13, 14]
+    },
+    {
+      id: "evt-dl-7",
+      timestamp: "09:38 UTC",
+      author: "@datadog-bot & @elena_oncall",
+      type: "RESOLUTION",
+      summary: "Incident Resolved: Postgres connection pool drained to baseline (145/2,000); errors cleared.",
+      rawSnippet: "[09:38:20] @datadog-bot: RECOVERY - Postgres active connections returned to baseline (145 / 2,000)",
+      timeLostMinutes: 0,
+      details: "HTTP 500 error rate dropped to 0.01%. Under Attack mode disabled. Bridge closed at 09:43 UTC. Total duration: 28 minutes.",
+      sourceLineIndices: [15, 16, 17, 18]
+    }
+  ],
+  actionItems: [
+    {
+      priority: "P0",
+      action: "Install pg-safe-migrations linter in CI to prohibit raw ACCESS EXCLUSIVE locks on production tables.",
+      owner: "@dba-infra"
+    },
+    {
+      priority: "P1",
+      action: "Implement randomized exponential backoff with full jitter on client transaction retry logic to prevent retry storms.",
+      owner: "@client-apps"
+    },
+    {
+      priority: "P2",
+      action: "Configure Datadog monitor alerting on transactions holding locks for greater than 5 seconds.",
+      owner: "@sre-observability"
+    }
+  ],
+  markdownReport: `# Incident Postmortem: Database Lock Contention & Transaction Timeout Storm
+
+**Incident Date:** 2026-10-18  
+**Severity:** P1 (Critical Outage)  
+**Duration:** 28 minutes (09:15 UTC – 09:43 UTC)  
+**Time to Detect (TTD):** 1 minute  
+**Time to Resolve (TTR):** 28 minutes  
+**Triage Efficiency Ratio:** 50% of incident duration spent investigating false lead (DDoS attack)
+
+---
+
+## Executive Summary
+At 09:15 UTC, the primary Postgres database cluster experienced severe lock contention, with CPU hitting 98% and active connection counts reaching 1,980 out of the 2,000 maximum ceiling. As a result, 23.4% of API transaction commits failed with HTTP 500.
+
+Triage initially burned 14 minutes chasing an assumed Layer 7 volumetric DDoS attack, enabling Cloudflare Under Attack challenge screens that had zero impact on error rates. Origin inspection subsequently revealed that the traffic spike was composed of client apps aggressively retrying failing transactions without backoff. DBA intervention at 09:28 UTC isolated an unscheduled background migration holding an \`ACCESS EXCLUSIVE\` lock on \`user_balances\`. Terminating the blocking PID restored full system stability by 09:43 UTC.
+
+---
+
+## Root Cause Analysis
+- **Trigger:** An unscheduled background billing migration script executed \`ALTER TABLE user_balances ADD COLUMN tax_exempt_status\` directly against the production primary without concurrent table alteration protections.
+- **Lock Contention:** The DDL acquired an \`ACCESS EXCLUSIVE\` lock on \`user_balances\`, blocking all inbound SELECT, INSERT, and UPDATE queries touching user balance state.
+- **Thundering Herd:** As frontend requests timed out, client SDKs initiated aggressive un-jittered retries, multiplying traffic volume from 12k to 45k req/sec and rapidly exhausting the Postgres 2,000-connection limit.
+
+---
+
+## Chronological Timeline
+
+| Time (UTC) | Severity / Type | Key Event | Notes / Attribution |
+|---|---|---|---|
+| **09:15** | \`CRITICAL_ALERT\` | Postgres CPU 98%, connections 1,980/2,000 | Datadog-Bot |
+| **09:16** | \`TRIAGE\` | Traffic spikes from 12k to 45k req/sec | @elena_oncall |
+| **09:17** | \`FALSE_LEAD\` | **14m Lost:** Investigated Layer 7 DDoS & enabled Cloudflare edge drops | @security_sam (Disproven at 09:27) |
+| **09:28** | \`TRIAGE\` | \`pg_stat_activity\` shows 1,450 queries waiting on PID 88412 | @david_dba |
+| **09:30** | \`ROOT_CAUSE\` | **Culprit Isolated:** Unscheduled ACCESS EXCLUSIVE lock on \`user_balances\` | @david_dba |
+| **09:33** | \`MITIGATION\` | Terminated blocking query (\`pg_terminate_backend(88412)\`) | @david_dba |
+| **09:38** | \`RESOLUTION\` | Connection pool drained to baseline, 500 errors dropped to 0.01% | @elena_oncall |
+
+---
+
+## Remediation & Action Items
+
+- **[P0]** Install \`pg-safe-migrations\` linter in CI to prohibit raw ACCESS EXCLUSIVE locks on production tables (\`@dba-infra\`)
+- **[P1]** Implement randomized exponential backoff with full jitter on client transaction retry logic to prevent retry storms (\`@client-apps\`)
+- **[P2]** Configure Datadog monitor alerting on transactions holding locks for greater than 5 seconds (\`@sre-observability\`)
+`
+};
+
+export interface DemoPreset {
+  id: 'flash_sale' | 'db_deadlock';
+  title: string;
+  subtitle: string;
+  summary: string;
+  rawLog: string;
+  synthesized: SynthesizedIncident;
+}
+
+export const DEMO_PRESETS: DemoPreset[] = [
+  {
+    id: 'flash_sale',
+    title: 'Flash Sale 504s',
+    subtitle: 'Connection pool exhaustion; Redis detour',
+    summary: 'Third-party webhook stall with 18m Redis rabbit hole',
+    rawLog: DEMO_RAW_LOG,
+    synthesized: DEMO_SYNTHESIZED_DATA
+  },
+  {
+    id: 'db_deadlock',
+    title: 'Database Deadlock',
+    subtitle: 'Exclusive table lock; DDoS false alarm',
+    summary: 'ALTER TABLE exclusive lock with 14m DDoS rabbit hole',
+    rawLog: DEADLOCK_RAW_LOG,
+    synthesized: DEADLOCK_SYNTHESIZED_DATA
+  }
+];

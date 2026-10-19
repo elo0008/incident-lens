@@ -1,5 +1,10 @@
 import { SynthesizedIncident, TimelineEvent } from '../types/incident';
-import { DEMO_RAW_LOG, DEMO_SYNTHESIZED_DATA } from '../data/demoIncident';
+import {
+  DEMO_RAW_LOG,
+  DEMO_SYNTHESIZED_DATA,
+  DEADLOCK_RAW_LOG,
+  DEADLOCK_SYNTHESIZED_DATA
+} from '../data/demoIncident';
 
 export interface AISettings {
   apiKey: string;
@@ -165,10 +170,16 @@ export async function synthesizeIncidentLogs(
   rawLog: string,
   settings: AISettings
 ): Promise<SynthesisResult> {
-  // If the log matches our pre-loaded demo incident, return the verified ground truth data
+  // If the log matches either of our pre-loaded demo incident presets, return verified ground truth data
   if (rawLog.trim() === DEMO_RAW_LOG.trim()) {
     return {
       incident: DEMO_SYNTHESIZED_DATA,
+      mode: 'offline_verified'
+    };
+  }
+  if (rawLog.trim() === DEADLOCK_RAW_LOG.trim()) {
+    return {
+      incident: DEADLOCK_SYNTHESIZED_DATA,
       mode: 'offline_verified'
     };
   }
