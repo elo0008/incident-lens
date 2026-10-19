@@ -190,14 +190,14 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                 <div
                   key={idx}
                   ref={isFirstHighlighted ? highlightedRef : null}
-                  className={`flex items-start font-mono text-xs leading-6 px-1 transition-colors ${
+                  className={`flex items-start font-mono text-xs leading-6 px-1 border-l-2 transition-all duration-300 ${
                     isHighlighted
-                      ? 'bg-cyan-950/40 border-l-2 border-cyan-400 text-cyan-200 font-medium'
-                      : 'text-slate-300 hover:bg-slate-900/40'
+                      ? 'border-cyan-400 bg-cyan-950/40 text-cyan-200 font-medium animate-line-flash shadow-[inset_0_0_12px_rgba(6,182,212,0.15)]'
+                      : 'border-transparent text-slate-300 hover:bg-slate-900/40'
                   }`}
                 >
                   <span
-                    className={`w-12 shrink-0 select-none text-right pr-4 font-mono ${
+                    className={`w-12 shrink-0 select-none text-right pr-4 font-mono transition-colors duration-300 ${
                       isHighlighted ? 'text-cyan-300 font-bold' : 'text-slate-600'
                     }`}
                   >

@@ -26,3 +26,45 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #374151;
 }
+
+/* Production-Grade UI Motion Keyframes */
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up-fade {
+  animation: slideUpFade 250ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes lineFlash {
+  0% {
+    background-color: rgba(6, 182, 212, 0.35);
+  }
+  100% {
+    background-color: rgba(8, 47, 73, 0.4);
+  }
+}
+
+.animate-line-flash {
+  animation: lineFlash 400ms ease-out forwards;
+}
+
+@keyframes viewFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-view-fade {
+  animation: viewFade 150ms ease-in-out forwards;
+}

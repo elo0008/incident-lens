@@ -150,7 +150,7 @@ export const App: React.FC = () => {
                   <button
                     id="tab-timeline-view"
                     onClick={() => setViewMode('timeline')}
-                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all duration-100 active:scale-95 ${
                       viewMode === 'timeline'
                         ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
@@ -163,7 +163,7 @@ export const App: React.FC = () => {
                   <button
                     id="tab-postmortem-view"
                     onClick={() => setViewMode('postmortem')}
-                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all ${
+                    className={`flex items-center space-x-1.5 px-3 py-1 rounded-md transition-all duration-100 active:scale-95 ${
                       viewMode === 'postmortem'
                         ? 'bg-cyan-500/15 text-cyan-300 font-semibold border border-cyan-500/30 shadow-sm'
                         : 'text-slate-400 hover:text-slate-200'
@@ -178,13 +178,17 @@ export const App: React.FC = () => {
               {/* View Container */}
               <div className="flex-1 overflow-hidden">
                 {viewMode === 'timeline' ? (
-                  <TimelineView
-                    incident={incident}
-                    selectedEventId={selectedEventId}
-                    onSelectEvent={handleSelectEvent}
-                  />
+                  <div key="timeline-view" className="h-full animate-view-fade">
+                    <TimelineView
+                      incident={incident}
+                      selectedEventId={selectedEventId}
+                      onSelectEvent={handleSelectEvent}
+                    />
+                  </div>
                 ) : (
-                  <PostmortemView incident={incident} />
+                  <div key="postmortem-view" className="h-full animate-view-fade">
+                    <PostmortemView incident={incident} />
+                  </div>
                 )}
               </div>
             </div>

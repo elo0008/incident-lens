@@ -155,6 +155,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 <TimelineNodeCard
                   key={event.id}
                   event={event}
+                  index={idx}
                   isSelected={selectedEventId === event.id}
                   onSelect={onSelectEvent}
                   isLast={idx === filteredEvents.length - 1}

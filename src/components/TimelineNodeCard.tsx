@@ -17,6 +17,7 @@ interface TimelineNodeCardProps {
   isSelected: boolean;
   onSelect: (event: TimelineEvent) => void;
   isLast: boolean;
+  index?: number;
 }
 
 const getBadgeConfig = (type: EventType) => {
@@ -71,7 +72,8 @@ export const TimelineNodeCard: React.FC<TimelineNodeCardProps> = ({
   event,
   isSelected,
   onSelect,
-  isLast
+  isLast,
+  index = 0
 }) => {
   const config = getBadgeConfig(event.type);
   const Icon = config.icon;
@@ -79,7 +81,10 @@ export const TimelineNodeCard: React.FC<TimelineNodeCardProps> = ({
   const isRootCause = event.type === 'ROOT_CAUSE';
 
   return (
-    <div className="relative pl-7 group">
+    <div
+      className="relative pl-7 group animate-slide-up-fade"
+      style={{ animationDelay: `${index * 60}ms` }}
+    >
       {/* Vertical Spine */}
       {!isLast && (
         <div

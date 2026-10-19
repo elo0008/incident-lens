@@ -73,7 +73,7 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
           <div className="flex items-center gap-2">
             <button
               onClick={handleCopyJira}
-              className="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition-all duration-100 active:scale-95"
             >
               {copiedJira ? (
                 <>
@@ -86,14 +86,14 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
             </button>
             <button
               onClick={handleDownloadMd}
-              className="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition-colors"
+              className="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 flex items-center gap-1.5 transition-all duration-100 active:scale-95"
             >
               <Download className="w-3.5 h-3.5 text-slate-400" />
               <span>Export .md</span>
             </button>
             <button
               onClick={handleCopyMd}
-              className="px-3 py-1 text-xs rounded bg-cyan-600 hover:bg-cyan-500 text-white font-medium flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1 text-xs rounded bg-cyan-600 hover:bg-cyan-500 text-white font-medium flex items-center gap-1.5 transition-all duration-100 active:scale-95 shadow-sm"
             >
               {copiedMd ? (
                 <>

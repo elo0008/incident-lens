@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AlertCircle, CheckCircle2, Clock, Hourglass } from 'lucide-react';
 import { ExecutiveSummary } from '../types/incident';
 
@@ -7,6 +7,17 @@ interface TriageEfficiencyBarProps {
 }
 
 export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summary }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    // Reset and trigger smooth reveal transition on mount or summary switch
+    setMounted(false);
+    const frame = requestAnimationFrame(() => {
+      setMounted(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [summary.title]);
+
   const triagePercent = Math.round(summary.triageTimeRatio * 100);
   const remediationPercent = 100 - triagePercent;
   const triageMinutes = Math.round(summary.ttrMinutes * summary.triageTimeRatio);
@@ -57,13 +68,13 @@ export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summar
         {/* Multi-segment Progress Bar */}
         <div className="h-2 w-full bg-slate-950 rounded-full overflow-hidden flex border border-slate-800">
           <div
-            style={{ width: `${triagePercent}%` }}
-            className="h-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-700 relative group cursor-help"
+            style={{ width: mounted ? `${triagePercent}%` : '0%' }}
+            className="h-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-700 ease-out relative group cursor-help"
             title={`Triage & Rabbit Holes: ${triageMinutes} mins (${triagePercent}%)`}
           />
           <div
-            style={{ width: `${remediationPercent}%` }}
-            className="h-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-all duration-700 relative group cursor-help"
+            style={{ width: mounted ? `${remediationPercent}%` : '0%' }}
+            className="h-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-all duration-700 ease-out relative group cursor-help"
             title={`Remediation & Fix Verification: ${remediationMinutes} mins (${remediationPercent}%)`}
           />
         </div>
