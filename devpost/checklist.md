@@ -39,7 +39,7 @@ Build mode: fast
   Learner check: Clear the editor, type "hello world", hit Synthesize, verify the warning banner appears, then load demo incident and watch the 3-stage pulse.
   Commit: `Add log validation and 3-stage loading progress pulse`
 
-- [ ] **4. SRE postmortem markdown preview & one-click clipboard export**
+- [x] **4. SRE postmortem markdown preview & one-click clipboard export**
   Becomes usable: The user can toggle between `[Timeline View]` and `[Postmortem Markdown]`, inspect the formatted SRE postmortem (using `react-markdown` and `remark-gfm`), and click `[Copy Markdown]` with instant clipboard write and flashing checkmark confirmation.
   Why now: Delivers the primary tangible output of IncidentLens—completing the full core loop and closing the product definition.
   PRD ref: `prd.md > Features and Behavior > 4. SRE Postmortem Markdown Generation`

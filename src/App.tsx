@@ -5,8 +5,9 @@ import { EmptyStateBlueprint } from './components/EmptyStateBlueprint';
 import { TimelineView } from './components/TimelineView';
 import { PostmortemView } from './components/PostmortemView';
 import { LoadingPulse } from './components/LoadingPulse';
-import { DEMO_RAW_LOG, DEMO_SYNTHESIZED_DATA } from './data/demoIncident';
+import { DEMO_RAW_LOG } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
+import { getStoredAISettings, synthesizeIncidentLogs } from './services/synthesisService';
 import { SynthesizedIncident, SynthesisStatus, TimelineEvent, ViewMode } from './types/incident';
 import { Clock, Copy, FileText, Check } from 'lucide-react';
 
@@ -19,6 +20,7 @@ export const App: React.FC = () => {
   const [highlightedLineIndices, setHighlightedLineIndices] = useState<number[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [copiedHeader, setCopiedHeader] = useState<boolean>(false);
+  const [activeMode, setActiveMode] = useState<'offline_verified' | 'live_ai'>('offline_verified');
 
   const handleRawLogChange = (newVal: string) => {
     setRawLog(newVal);
@@ -35,25 +37,33 @@ export const App: React.FC = () => {
     setHighlightedLineIndices([]);
 
     if (autoSynthesize) {
-      triggerSynthesisProcess();
+      triggerSynthesisProcess(DEMO_RAW_LOG);
     }
   };
 
-  const triggerSynthesisProcess = () => {
+  const triggerSynthesisProcess = async (textToSynthesize?: string) => {
     setWarningMessage(null);
     setStatus('loading');
 
-    // 1600ms allows the 3-stage progress pulse to transition through all steps
-    setTimeout(() => {
-      setIncident(DEMO_SYNTHESIZED_DATA);
-      setStatus('success');
-      // Auto-select false lead to immediately showcase the unique kernel
-      const falseLeadEvent = DEMO_SYNTHESIZED_DATA.events.find(e => e.type === 'FALSE_LEAD');
-      if (falseLeadEvent) {
-        setSelectedEventId(falseLeadEvent.id);
-        setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
-      }
-    }, 1600);
+    const targetText = textToSynthesize || rawLog;
+    const settings = getStoredAISettings();
+
+    // Give 1200ms so 3-stage pulse shows smoothly
+    const [result] = await Promise.all([
+      synthesizeIncidentLogs(targetText, settings),
+      new Promise((res) => setTimeout(res, 1200))
+    ]);
+
+    setIncident(result.incident);
+    setActiveMode(result.mode);
+    setStatus('success');
+
+    // Auto-select false lead or root cause to showcase kernel immediately
+    const falseLeadEvent = result.incident.events.find((e) => e.type === 'FALSE_LEAD');
+    if (falseLeadEvent) {
+      setSelectedEventId(falseLeadEvent.id);
+      setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
+    }
   };
 
   // Synthesize timeline with pre-validation
@@ -99,7 +109,7 @@ export const App: React.FC = () => {
   };
 
   const isDemoLoaded = rawLog === DEMO_RAW_LOG;
-  const selectedEvent = incident?.events.find(e => e.id === selectedEventId);
+  const selectedEvent = incident?.events.find((e) => e.id === selectedEventId);
 
   return (
     <div className="h-screen w-screen flex flex-col bg-slate-950 text-slate-100 overflow-hidden font-sans">
@@ -108,6 +118,7 @@ export const App: React.FC = () => {
         onLoadDemo={handleLoadDemo}
         status={status}
         isDemoLoaded={isDemoLoaded}
+        activeMode={activeMode}
       />
 
       {/* Main Two-Pane Workplace */}
