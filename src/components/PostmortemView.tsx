@@ -3,12 +3,14 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Check, CheckSquare, Copy, Download, FileText } from 'lucide-react';
 import { SynthesizedIncident } from '../types/incident';
+import { VerificationSummary } from '../services/synthesisService';
 
 interface PostmortemViewProps {
   incident: SynthesizedIncident;
+  verification?: VerificationSummary;
 }
 
-export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
+export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident, verification }) => {
   const [copiedMd, setCopiedMd] = useState(false);
   const [copiedJira, setCopiedJira] = useState(false);
   const [checkedItems, setCheckedItems] = useState<Record<number, boolean>>({});
@@ -69,8 +71,17 @@ export const PostmortemView: React.FC<PostmortemViewProps> = ({ incident }) => {
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-cyan-400" />
             <span className="font-mono text-sm text-slate-200">incident-postmortem.md</span>
-            <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              Audit Ready
+            <span
+              className={`text-xs px-2 py-0.5 rounded border ${
+                verification && verification.grounded === verification.total
+                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                  : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+              }`}
+              title={verification?.warnings?.join('\n')}
+            >
+              {verification
+                ? `${verification.grounded}/${verification.total} milestones traced to log lines`
+                : `${incident.events.length}/${incident.events.length} milestones traced to log lines`}
             </span>
           </div>
           <div className="flex items-center gap-2">

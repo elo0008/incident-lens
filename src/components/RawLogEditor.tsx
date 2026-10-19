@@ -84,12 +84,12 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
             >
               {isEditing ? (
                 <>
-                  <Eye className="w-3 h-3 text-cyan-400" />
+                  <Eye className="w-3.5 h-3.5 text-cyan-400" />
                   <span>Inspect View</span>
                 </>
               ) : (
                 <>
-                  <Edit3 className="w-3 h-3 text-slate-400" />
+                  <Edit3 className="w-3.5 h-3.5 text-slate-400" />
                   <span>Edit Raw</span>
                 </>
               )}
@@ -111,7 +111,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
         </div>
       </div>
 
-      {/* Active Source Highlight Callout Banner - Enhanced padding, no overflow-hidden, relative flex orb */}
+      {/* Active Source Highlight Callout Banner */}
       {highlightedLineIndices.length > 0 && selectedEventSummary && (
         <div className="px-3 py-1.5 bg-cyan-950/40 border-b border-cyan-500/30 text-xs font-mono text-cyan-300 flex items-center justify-between shrink-0 animate-fadeIn">
           <div className="flex items-center min-w-0 pr-2">
@@ -174,13 +174,13 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
               onChange={(e) => onChange(e.target.value)}
               onScroll={handleScroll}
               disabled={status === 'loading'}
-              placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr select a scenario preset from the top navbar to load verified incident logs.`}
+              placeholder={`Paste chaotic Slack/Discord chat, Datadog alerts, or terminal outputs here...\n\nExample:\n[14:02:11] @datadog-bot: ALERT - PaymentService p99 > 4200ms\n[14:03:15] @marcus_oncall: Acknowledging. Traffic is 4x baseline.\n[14:06:20] @alex_backend: Redis memory alerts tripped earlier...\n\nOr use "Load sample incident" in the top bar.`}
               className="flex-1 py-3 px-3 bg-transparent text-slate-200 placeholder:text-slate-600 resize-none focus:outline-none font-mono text-xs leading-6 overflow-y-auto overflow-x-auto whitespace-pre selection:bg-cyan-500/30"
               spellCheck={false}
             />
           </div>
         ) : (
-          /* Inspect View Mode: Single unified scroll container with whole-word wrapping (break-words) */
+          /* Inspect View Mode: Single unified scroll container with whole-word wrapping (break-words) and left-aligned text */
           <div className="w-full h-full overflow-y-auto py-3 bg-slate-950">
             {lines.map((line, idx) => {
               const isHighlighted = highlightedLineIndices.includes(idx);
@@ -203,7 +203,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
                   >
                     {idx + 1}
                   </span>
-                  <span className="flex-1 whitespace-pre-wrap break-words text-justify">
+                  <span className="flex-1 whitespace-pre-wrap break-words text-left">
                     {line || ' '}
                   </span>
                 </div>

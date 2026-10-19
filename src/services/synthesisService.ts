@@ -1,10 +1,14 @@
-import { SynthesizedIncident, TimelineEvent } from '../types/incident';
-import { DEMO_PRESETS, DEMO_RAW_LOG, DEMO_SYNTHESIZED_DATA } from '../data/demoIncident';
+import { ActionItem, EventType, SynthesizedIncident, TimelineEvent } from '../types/incident';
+import { DEMO_PRESETS } from '../data/demoIncident';
+import { verifyIncident } from './verify';
+
+export type AIModel = 'gpt-4o-mini' | 'gpt-4o';
+export const ALLOWED_MODELS: AIModel[] = ['gpt-4o-mini', 'gpt-4o'];
 
 export interface AISettings {
   apiKey: string;
-  provider: 'openai' | 'gemini';
-  model: string;
+  provider: 'openai';
+  model: AIModel;
 }
 
 const STORAGE_KEY = 'incidentlens_ai_settings';
@@ -13,7 +17,13 @@ export function getStoredAISettings(): AISettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw);
+      const parsed = JSON.parse(raw);
+      const model: AIModel = ALLOWED_MODELS.includes(parsed.model) ? parsed.model : 'gpt-4o-mini';
+      return {
+        apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : '',
+        provider: 'openai',
+        model
+      };
     }
   } catch (err) {
     console.error('Error reading AI settings from localStorage', err);
@@ -27,189 +37,107 @@ export function getStoredAISettings(): AISettings {
 
 export function saveAISettings(settings: AISettings): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+    const model: AIModel = ALLOWED_MODELS.includes(settings.model) ? settings.model : 'gpt-4o-mini';
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...settings, provider: 'openai', model }));
   } catch (err) {
     console.error('Error saving AI settings to localStorage', err);
   }
 }
 
+export class SynthesisError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SynthesisError';
+  }
+}
+
+export function getBlockingReason(rawLog: string, settings: AISettings): string | null {
+  const trimmed = rawLog.trim();
+  const isPreset = DEMO_PRESETS.some(p => p.rawLog.trim() === trimmed);
+  if (isPreset) {
+    return null;
+  }
+  if (!settings.apiKey || !settings.apiKey.trim()) {
+    return `Sample mode only analyzes the ${DEMO_PRESETS.length} built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon).`;
+  }
+  if (rawLog.length > 60000) {
+    return `Input log is too long (${rawLog.length} characters). Maximum allowed length is 60,000 characters.`;
+  }
+  return null;
+}
+
+export interface VerificationSummary {
+  grounded: number;
+  total: number;
+  warnings: string[];
+}
+
 export interface SynthesisResult {
   incident: SynthesizedIncident;
   mode: 'offline_verified' | 'live_ai';
-  notice?: string;
+  verification: VerificationSummary;
 }
 
-/**
- * Maps raw snippets back to line indices in the original log text
- */
-function correlateSourceLines(rawLog: string, events: TimelineEvent[]): TimelineEvent[] {
-  const lines = rawLog.split('\n');
-
-  return events.map((event) => {
-    if (event.sourceLineIndices && event.sourceLineIndices.length > 0) {
-      return event;
-    }
-
-    // Try finding matching lines by snippet or author
-    const matchedIndices: number[] = [];
-    const searchTerms = [
-      event.timestamp,
-      event.author,
-      ...(event.rawSnippet ? [event.rawSnippet.slice(0, 30)] : [])
-    ];
-
-    lines.forEach((line, idx) => {
-      if (searchTerms.some(term => term && line.includes(term))) {
-        matchedIndices.push(idx);
-      }
-    });
-
-    return {
-      ...event,
-      sourceLineIndices: matchedIndices.length > 0 ? matchedIndices : [0]
-    };
-  });
-}
-
-/**
- * Fallback synthesizer for custom logs when running offline or without an API key
- */
-function generateOfflineSynthesis(rawLog: string): SynthesizedIncident {
-  const lines = rawLog.split('\n').filter(l => l.trim().length > 0);
-  const firstLine = lines[0] || '';
-  const lastLine = lines[lines.length - 1] || '';
-
-  // Extract any timestamp patterns
-  const timeRegex = /\[?(\d{1,2}:\d{2}(?::\d{2})?(?:\s*[A-Z]+)?)\]?/;
-  const firstTimeMatch = firstLine.match(timeRegex);
-  const lastTimeMatch = lastLine.match(timeRegex);
-  const startTime = firstTimeMatch ? firstTimeMatch[1] : '00:00 UTC';
-  const endTime = lastTimeMatch ? lastTimeMatch[1] : '00:35 UTC';
-
-  return {
-    executiveSummary: {
-      title: "Synthesized Incident Timeline (Custom Log Stream)",
-      impact: "Production degradation detected and mitigated across " + lines.length + " log milestones.",
-      ttdMinutes: 4,
-      ttrMinutes: 35,
-      triageTimeRatio: 0.38
-    },
-    rootCause: {
-      summary: "Degradation isolated from log stream patterns across triage nodes.",
-      discoveredAt: endTime,
-      discoveredBy: "@incident-commander"
-    },
-    events: [
-      {
-        id: "evt-gen-1",
-        timestamp: startTime,
-        author: "Alert-Stream",
-        type: "CRITICAL_ALERT",
-        summary: "Initial alert threshold breached in log stream.",
-        rawSnippet: firstLine,
-        timeLostMinutes: 0,
-        details: "Incident detected and triage initiated.",
-        sourceLineIndices: [0]
-      },
-      {
-        id: "evt-gen-2",
-        timestamp: "T+10m",
-        author: "@oncall",
-        type: "FALSE_LEAD",
-        summary: "False Lead: Initial hypothesis disproven after metric verification.",
-        rawSnippet: lines[Math.floor(lines.length / 3)] || firstLine,
-        timeLostMinutes: 12,
-        details: "Team investigated unverified suspect component before disproving symptom. 12 mins lost.",
-        sourceLineIndices: [Math.floor(lines.length / 3)]
-      },
-      {
-        id: "evt-gen-3",
-        timestamp: "T+22m",
-        author: "@sre-lead",
-        type: "ROOT_CAUSE",
-        summary: "Root Cause Isolated: Primary failure trigger identified from system telemetry.",
-        rawSnippet: lines[Math.floor((lines.length * 2) / 3)] || lastLine,
-        timeLostMinutes: 0,
-        details: "Culprit verified and remediation procedure scheduled.",
-        sourceLineIndices: [Math.floor((lines.length * 2) / 3)]
-      },
-      {
-        id: "evt-gen-4",
-        timestamp: endTime,
-        author: "@incident-lead",
-        type: "RESOLUTION",
-        summary: "Mitigation applied; metrics returned to normal operating parameters.",
-        rawSnippet: lastLine,
-        timeLostMinutes: 0,
-        details: "Bridge closed. Service restored.",
-        sourceLineIndices: [lines.length - 1]
-      }
-    ],
-    actionItems: [
-      {
-        priority: "P0",
-        action: "Add automated circuit-breaker on failing dependency.",
-        owner: "@platform-team"
-      },
-      {
-        priority: "P1",
-        action: "Improve observability dashboards to prevent false lead investigation.",
-        owner: "@sre"
-      }
-    ],
-    markdownReport: `# Incident Postmortem: Custom Incident Stream
-
-**Duration:** 35 minutes (${startTime} – ${endTime})
-
-## Executive Summary
-Incident resolved after isolating culprit and disproving initial triage rabbit hole.
-
-## Root Cause
-Telemetry confirmed failure trigger at ${endTime}.
-
-## Remediation Items
-- [P0] Deploy circuit-breaker
-- [P1] Improve triage telemetry
-`
-  };
-}
+const VALID_EVENT_TYPES: Set<EventType> = new Set([
+  'CRITICAL_ALERT',
+  'TRIAGE',
+  'FALSE_LEAD',
+  'ROOT_CAUSE',
+  'MITIGATION',
+  'RESOLUTION'
+]);
 
 export async function synthesizeIncidentLogs(
   rawLog: string,
   settings: AISettings
 ): Promise<SynthesisResult> {
-  // If the log matches any of our pre-loaded presets, return the verified ground truth data
-  const matchingPreset = DEMO_PRESETS.find(p => p.rawLog.trim() === rawLog.trim());
+  const trimmed = rawLog.trim();
+  const matchingPreset = DEMO_PRESETS.find(p => p.rawLog.trim() === trimmed);
+
   if (matchingPreset) {
+    const verified = verifyIncident(matchingPreset.rawLog, matchingPreset.synthesizedData, {
+      recomputeTimeLost: false
+    });
     return {
-      incident: matchingPreset.synthesizedData,
-      mode: 'offline_verified'
-    };
-  }
-
-  // If no API key is provided, use structured deterministic offline synthesizer
-  if (!settings.apiKey) {
-    const offlineIncident = generateOfflineSynthesis(rawLog);
-    return {
-      incident: correlateSourceLines(rawLog, offlineIncident.events).length
-        ? { ...offlineIncident, events: correlateSourceLines(rawLog, offlineIncident.events) }
-        : offlineIncident,
+      incident: verified.incident,
       mode: 'offline_verified',
-      notice: 'Synthesized using verified offline engine (no API key configured).'
+      verification: {
+        grounded: verified.groundedCount,
+        total: verified.totalCount,
+        warnings: verified.warnings
+      }
     };
   }
 
-  // Attempt live structured completion with configured LLM
-  try {
-    const prompt = `You are IncidentLens, an expert SRE incident postmortem timeline synthesizer.
-Analyze the following unstructured incident chat/alert logs and output a single JSON object strictly matching this schema:
+  const blockingReason = getBlockingReason(rawLog, settings);
+  if (blockingReason) {
+    throw new SynthesisError(blockingReason);
+  }
+
+  const rawLines = rawLog.split(/\r?\n/);
+  const numberedLog = rawLines
+    .map((line, idx) => `${idx + 1}| ${line}`)
+    .join('\n');
+
+  const systemPrompt = `You are IncidentLens, an expert SRE incident postmortem timeline synthesizer.
+Analyze the following numbered raw incident chat and alert logs and output a single JSON object.
+Every line has been prefixed with its 1-based line number in the format "N| text".
+
+Strict rules:
+1. NEVER invent timestamps, people/authors, or root causes that do not appear in the log.
+2. For each event, copy the exact timestamp string from the source log and quote an exact rawSnippet substring.
+3. Every event MUST cite at least one line number in "sourceLineNumbers" corresponding to the "N|" line numbers shown.
+4. Categorize any wrong hypotheses, false alarms, or dead-end investigations that engineers pursued and subsequently disproved as "FALSE_LEAD".
+5. Identify the singular true root cause as "ROOT_CAUSE".
+
+Schema:
 {
   "executiveSummary": {
     "title": "string",
     "impact": "string",
     "ttdMinutes": number,
     "ttrMinutes": number,
-    "triageTimeRatio": number (0.0 to 1.0, ratio of outage spent on false leads / triage rabbit holes)
+    "triageTimeRatio": number (0.0 to 1.0)
   },
   "rootCause": {
     "summary": "string",
@@ -218,61 +146,194 @@ Analyze the following unstructured incident chat/alert logs and output a single 
   },
   "events": [
     {
-      "id": "evt-N",
-      "timestamp": "string (UTC preferred)",
-      "author": "string",
+      "timestamp": "exact timestamp string from log line",
+      "author": "author handle or system alert name",
       "type": "CRITICAL_ALERT" | "TRIAGE" | "FALSE_LEAD" | "ROOT_CAUSE" | "MITIGATION" | "RESOLUTION",
-      "summary": "string",
-      "rawSnippet": "exact short quote from log",
-      "timeLostMinutes": number (greater than 0 for FALSE_LEAD, otherwise 0),
-      "details": "string"
+      "summary": "concise description",
+      "rawSnippet": "exact verbatim quote from log",
+      "sourceLineNumbers": [number],
+      "timeLostMinutes": number,
+      "details": "detailed description"
     }
   ],
   "actionItems": [
-    { "priority": "P0" | "P1" | "P2", "action": "string", "owner": "string" }
+    {
+      "priority": "P0" | "P1" | "P2",
+      "action": "string",
+      "owner": "string"
+    }
   ],
-  "markdownReport": "complete markdown SRE postmortem document string with Title, Summary, Root Cause, Timeline table, and Action Items"
-}
+  "markdownReport": "complete non-empty Markdown postmortem document"
+}`;
 
-IMPORTANT: Look specifically for false leads, wrong hypotheses, or detours engineers investigated that were later disproven. Tag them as "FALSE_LEAD" with estimated timeLostMinutes.
-
-RAW LOGS:
-${rawLog}`;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  let response: Response;
+  try {
+    response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${settings.apiKey}`
+        Authorization: `Bearer ${settings.apiKey.trim()}`
       },
       body: JSON.stringify({
         model: settings.model || 'gpt-4o-mini',
-        messages: [{ role: 'user', content: prompt }],
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: numberedLog }
+        ],
         response_format: { type: 'json_object' },
         temperature: 0.2
       })
     });
+  } catch (err) {
+    throw new SynthesisError(
+      'Could not reach OpenAI (network or browser CORS error). Check your connection and try again.'
+    );
+  }
 
-    if (!response.ok) {
-      throw new Error(`API returned HTTP ${response.status}`);
+  if (!response.ok) {
+    if (response.status === 401) {
+      throw new SynthesisError(
+        'OpenAI API key was rejected (HTTP 401 Unauthorized). Please check your API key in Settings (gear icon).'
+      );
+    }
+    if (response.status === 429) {
+      throw new SynthesisError(
+        'OpenAI rate limit or quota exceeded (HTTP 429). Please check your account usage and quota limits.'
+      );
+    }
+    throw new SynthesisError(
+      `OpenAI returned HTTP ${response.status}. Please try again.`
+    );
+  }
+
+  let payload: any;
+  try {
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+    if (!content || typeof content !== 'string') {
+      throw new Error('Empty response content');
+    }
+    payload = JSON.parse(content);
+  } catch (err) {
+    throw new SynthesisError(
+      'Failed to parse valid JSON response from OpenAI. Please try again.'
+    );
+  }
+
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    !payload.executiveSummary ||
+    !payload.rootCause ||
+    !Array.isArray(payload.events) ||
+    payload.events.length === 0 ||
+    typeof payload.markdownReport !== 'string' ||
+    !payload.markdownReport.trim()
+  ) {
+    throw new SynthesisError(
+      'OpenAI response is missing required incident fields (executiveSummary, rootCause, events array, or markdownReport).'
+    );
+  }
+
+  const validEvents = payload.events.filter(
+    (e: any) => e && typeof e === 'object' && VALID_EVENT_TYPES.has(e.type)
+  );
+
+  if (validEvents.length === 0) {
+    throw new SynthesisError(
+      'OpenAI response did not contain at least one valid event matching required event types.'
+    );
+  }
+
+  const normalizedEvents: TimelineEvent[] = validEvents.map((rawEvent: any, idx: number) => {
+    let sourceLineIndices: number[] = [];
+
+    if (Array.isArray(rawEvent.sourceLineNumbers)) {
+      sourceLineIndices = rawEvent.sourceLineNumbers
+        .filter((n: any) => typeof n === 'number' && Number.isInteger(n))
+        .map((n: number) => n - 1);
     }
 
-    const data = await response.json();
-    const parsed: SynthesizedIncident = JSON.parse(data.choices[0].message.content);
-    const withLines = correlateSourceLines(rawLog, parsed.events);
+    if (sourceLineIndices.length === 0 && typeof rawEvent.rawSnippet === 'string') {
+      const snippet = rawEvent.rawSnippet.trim();
+      if (snippet.length >= 8) {
+        const targetSub = snippet.slice(0, 40);
+        rawLines.forEach((line, lineIdx) => {
+          if (line.includes(targetSub)) {
+            sourceLineIndices.push(lineIdx);
+          }
+        });
+      }
+    }
 
     return {
-      incident: { ...parsed, events: withLines },
-      mode: 'live_ai'
+      id: `evt-${idx + 1}`,
+      timestamp: String(rawEvent.timestamp || ''),
+      author: String(rawEvent.author || 'System'),
+      type: rawEvent.type as EventType,
+      summary: String(rawEvent.summary || ''),
+      rawSnippet: String(rawEvent.rawSnippet || ''),
+      timeLostMinutes: typeof rawEvent.timeLostMinutes === 'number' ? rawEvent.timeLostMinutes : 0,
+      details: typeof rawEvent.details === 'string' ? rawEvent.details : undefined,
+      sourceLineIndices
     };
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : 'API call failed';
-    console.warn('Live AI synthesis failed, falling back to offline verified engine:', errorMsg);
-    const fallback = generateOfflineSynthesis(rawLog);
-    return {
-      incident: { ...fallback, events: correlateSourceLines(rawLog, fallback.events) },
-      mode: 'offline_verified',
-      notice: `Live AI call failed (${errorMsg}). Synthesized using offline fallback engine.`
-    };
+  });
+
+  const rawRatio = Number(payload.executiveSummary.triageTimeRatio);
+  const triageTimeRatio = Number.isFinite(rawRatio)
+    ? Math.max(0, Math.min(1, rawRatio))
+    : 0;
+
+  const actionItems: ActionItem[] = Array.isArray(payload.actionItems)
+    ? payload.actionItems.map((item: any) => ({
+        priority: (['P0', 'P1', 'P2'].includes(item?.priority) ? item.priority : 'P1') as 'P0' | 'P1' | 'P2',
+        action: typeof item?.action === 'string' ? item.action : '',
+        owner: typeof item?.owner === 'string' ? item.owner : ''
+      }))
+    : [];
+
+  const normalizedIncident: SynthesizedIncident = {
+    executiveSummary: {
+      title: String(payload.executiveSummary.title || 'Synthesized Incident'),
+      impact: String(payload.executiveSummary.impact || ''),
+      ttdMinutes: Number(payload.executiveSummary.ttdMinutes) || 0,
+      ttrMinutes: Number(payload.executiveSummary.ttrMinutes) || 0,
+      triageTimeRatio
+    },
+    rootCause: {
+      summary: String(payload.rootCause.summary || ''),
+      discoveredAt: String(payload.rootCause.discoveredAt || ''),
+      discoveredBy: String(payload.rootCause.discoveredBy || '')
+    },
+    events: normalizedEvents,
+    actionItems,
+    markdownReport: String(payload.markdownReport)
+  };
+
+  const verified = verifyIncident(rawLog, normalizedIncident, {
+    recomputeTimeLost: true,
+    base: 0
+  });
+
+  const verifiedIncident = verified.incident;
+  const ttrMinutes = verifiedIncident.executiveSummary.ttrMinutes;
+  if (ttrMinutes > 0) {
+    const totalFalseLeadMinutes = verifiedIncident.events
+      .filter(e => e.type === 'FALSE_LEAD' && typeof e.timeLostMinutes === 'number')
+      .reduce((acc, e) => acc + (e.timeLostMinutes || 0), 0);
+    verifiedIncident.executiveSummary.triageTimeRatio = Math.min(
+      1,
+      Math.max(0, totalFalseLeadMinutes / ttrMinutes)
+    );
   }
+
+  return {
+    incident: verifiedIncident,
+    mode: 'live_ai',
+    verification: {
+      grounded: verified.groundedCount,
+      total: verified.totalCount,
+      warnings: verified.warnings
+    }
+  };
 }

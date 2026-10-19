@@ -5,18 +5,16 @@ import {
   ChevronDown,
   Database,
   Key,
-  Layers,
   Network,
   Settings,
   ShieldCheck,
   Sparkles,
-  Terminal,
   X,
   Zap
 } from 'lucide-react';
 import { SynthesisStatus } from '../types/incident';
-import { AISettings, getStoredAISettings, saveAISettings } from '../services/synthesisService';
-import { DEMO_PRESETS, IncidentPreset } from '../data/demoIncident';
+import { AIModel, AISettings, getStoredAISettings, saveAISettings } from '../services/synthesisService';
+import { DEMO_PRESETS } from '../data/demoIncident';
 
 interface TopNavbarProps {
   onSelectPreset: (presetId: string) => void;
@@ -63,6 +61,39 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   };
 
   const currentPreset = activePresetId ? DEMO_PRESETS.find(p => p.id === activePresetId) : null;
+  const hasApiKey = Boolean(settings.apiKey && settings.apiKey.trim().length > 0);
+
+  // Compute engine badge display and tooltip
+  const getEngineBadge = () => {
+    if (!hasApiKey) {
+      return {
+        label: `Sample mode · ${DEMO_PRESETS.length} built-in incidents`,
+        tooltip: 'Running in offline sample mode analyzing built-in verified sample incidents without API key.',
+        style: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+        icon: ShieldCheck,
+        iconColor: 'text-emerald-400'
+      };
+    }
+    if (activeMode === 'live_ai') {
+      return {
+        label: `Live AI · ${settings.model}`,
+        tooltip: `Synthesized using live OpenAI ${settings.model}.`,
+        style: 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300',
+        icon: Zap,
+        iconColor: 'text-cyan-400'
+      };
+    }
+    return {
+      label: `Live AI ready · ${settings.model}`,
+      tooltip: `OpenAI API key configured for ${settings.model}. Ready to analyze custom logs.`,
+      style: 'bg-cyan-500/10 border-cyan-500/30 text-cyan-300',
+      icon: Zap,
+      iconColor: 'text-cyan-400'
+    };
+  };
+
+  const engineBadge = getEngineBadge();
+  const EngineIcon = engineBadge.icon;
 
   return (
     <>
@@ -76,7 +107,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <div className="flex items-center space-x-2">
               <span className="font-bold text-slate-100 tracking-tight text-base">IncidentLens</span>
               <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700/60 uppercase tracking-wider">
-                SRE Synthesizer
+                Outage chat → timeline
               </span>
             </div>
           </div>
@@ -85,23 +116,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         {/* Engine Mode Status Badge */}
         <div className="hidden md:flex items-center space-x-3 text-xs font-mono">
           <div
-            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full border transition-all ${
-              activeMode === 'live_ai'
-                ? 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300'
-                : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-            }`}
+            title={engineBadge.tooltip}
+            className={`flex items-center space-x-1.5 px-2.5 py-1 rounded-full border transition-all cursor-help ${engineBadge.style}`}
           >
-            {activeMode === 'live_ai' ? (
-              <>
-                <Zap className="w-3.5 h-3.5 text-cyan-400" />
-                <span>Engine: Live AI ({settings.model || 'gpt-4o-mini'})</span>
-              </>
-            ) : (
-              <>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Engine: Demo Mode (Offline Verified)</span>
-              </>
-            )}
+            <EngineIcon className={`w-3.5 h-3.5 ${engineBadge.iconColor}`} />
+            <span>{engineBadge.label}</span>
           </div>
         </div>
 
@@ -117,8 +136,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               title="Select realistic verified incident scenario preset"
             >
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="hidden sm:inline font-mono font-semibold">Preset:</span>
-              <span className="text-slate-100">{currentPreset ? currentPreset.name : 'Select Scenario'}</span>
+              <span className="text-slate-100">
+                {currentPreset ? `Sample: ${currentPreset.name}` : 'Sample: Load sample incident'}
+              </span>
               <ChevronDown className={`w-3.5 h-3.5 text-cyan-400 transition-transform ${isPresetMenuOpen ? 'rotate-180' : ''}`} />
             </button>
 
@@ -126,7 +146,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             {isPresetMenuOpen && (
               <div className="absolute right-0 mt-2 w-72 rounded-xl bg-slate-900 border border-slate-800 shadow-2xl z-50 py-1.5 animate-fadeIn">
                 <div className="px-3 py-1.5 border-b border-slate-800 text-[10px] font-mono uppercase text-slate-400 tracking-wider flex items-center justify-between">
-                  <span>Load Scenario Logs</span>
+                  <span>Built-in samples</span>
                   <span className="text-cyan-400">Offline Verified</span>
                 </div>
 
@@ -180,13 +200,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           >
             <Settings className="w-4 h-4 text-slate-400 hover:text-slate-200" />
           </button>
-
-          <div className="h-4 w-px bg-slate-800 hidden sm:block" />
-
-          <div className="flex items-center space-x-1.5 text-xs text-slate-400 px-2 py-1 bg-slate-800/40 rounded border border-slate-800">
-            <Terminal className="w-3.5 h-3.5 text-slate-500" />
-            <span className="font-mono text-[11px] text-slate-300">v0.1.0-poc</span>
-          </div>
         </div>
       </header>
 
@@ -197,7 +210,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-4">
               <div className="flex items-center space-x-2">
                 <Key className="w-4 h-4 text-cyan-400" />
-                <h3 className="text-sm font-semibold text-slate-100">AI Extraction Engine Settings</h3>
+                <h3 className="text-sm font-semibold text-slate-100">Analyze your own logs</h3>
               </div>
               <button
                 onClick={() => setIsSettingsOpen(false)}
@@ -210,17 +223,17 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
             <form onSubmit={handleSaveSettings} className="space-y-4">
               <div>
                 <label className="block text-xs font-mono text-slate-300 mb-1">
-                  OpenAI-Compatible API Key (Optional)
+                  OpenAI API Key (Optional)
                 </label>
                 <input
                   type="password"
                   value={settings.apiKey}
                   onChange={(e) => setSettings({ ...settings, apiKey: e.target.value })}
-                  placeholder="sk-... (Leave empty for Offline Demo Mode)"
+                  placeholder="sk-... (Leave empty for Sample Mode)"
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-cyan-500"
                 />
-                <p className="text-[11px] text-slate-500 mt-1">
-                  Keys are stored exclusively in your local browser storage. If empty, IncidentLens uses the deterministic offline fallback engine.
+                <p className="text-[11px] text-slate-400 mt-1.5 leading-relaxed">
+                  Without an API key, IncidentLens analyzes all built-in sample incidents. To synthesize your own custom logs, add an OpenAI API key. Your key is stored exclusively in this browser's localStorage and is sent directly to OpenAI.
                 </p>
               </div>
 
@@ -228,12 +241,11 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
                 <label className="block text-xs font-mono text-slate-300 mb-1">Model</label>
                 <select
                   value={settings.model}
-                  onChange={(e) => setSettings({ ...settings, model: e.target.value })}
+                  onChange={(e) => setSettings({ ...settings, model: e.target.value as AIModel })}
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:border-cyan-500"
                 >
                   <option value="gpt-4o-mini">gpt-4o-mini (Fast & Structured)</option>
                   <option value="gpt-4o">gpt-4o</option>
-                  <option value="gemini-1.5-flash">gemini-1.5-flash</option>
                 </select>
               </div>
 

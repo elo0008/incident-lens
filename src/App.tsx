@@ -5,9 +5,15 @@ import { EmptyStateBlueprint } from './components/EmptyStateBlueprint';
 import { TimelineView } from './components/TimelineView';
 import { PostmortemView } from './components/PostmortemView';
 import { LoadingPulse } from './components/LoadingPulse';
-import { DEMO_PRESETS, DEMO_RAW_LOG } from './data/demoIncident';
+import { DEMO_PRESETS } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
-import { getStoredAISettings, synthesizeIncidentLogs } from './services/synthesisService';
+import {
+  getBlockingReason,
+  getStoredAISettings,
+  SynthesisError,
+  synthesizeIncidentLogs,
+  VerificationSummary
+} from './services/synthesisService';
 import { SynthesizedIncident, SynthesisStatus, TimelineEvent, ViewMode } from './types/incident';
 import { Clock, FileText } from 'lucide-react';
 
@@ -16,6 +22,7 @@ export const App: React.FC = () => {
   const [status, setStatus] = useState<SynthesisStatus>('idle');
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
   const [incident, setIncident] = useState<SynthesizedIncident | null>(null);
+  const [verification, setVerification] = useState<VerificationSummary | null>(null);
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const [highlightedLineIndices, setHighlightedLineIndices] = useState<number[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
@@ -39,6 +46,7 @@ export const App: React.FC = () => {
     setRawLog(preset.rawLog);
     // Explicitly reset right pane to idle (do not trigger synthesis)
     setIncident(null);
+    setVerification(null);
     setStatus('idle');
     setWarningMessage(null);
     setSelectedEventId(null);
@@ -58,29 +66,48 @@ export const App: React.FC = () => {
     const targetText = textToSynthesize || rawLog;
     const settings = getStoredAISettings();
 
-    // 2400ms allows the 3-stage progress pulse to transition through all steps (800ms each)
-    const [result] = await Promise.all([
-      synthesizeIncidentLogs(targetText, settings),
-      new Promise((res) => setTimeout(res, 2400))
-    ]);
+    try {
+      // 2400ms allows the 3-stage progress pulse to transition through all steps (800ms each)
+      const [result] = await Promise.all([
+        synthesizeIncidentLogs(targetText, settings),
+        new Promise((res) => setTimeout(res, 2400))
+      ]);
 
-    setIncident(result.incident);
-    setActiveMode(result.mode);
-    setStatus('success');
+      setIncident(result.incident);
+      setVerification(result.verification);
+      setActiveMode(result.mode);
+      setStatus('success');
 
-    // Auto-select false lead or root cause to showcase kernel immediately
-    const falseLeadEvent = result.incident.events.find((e) => e.type === 'FALSE_LEAD');
-    if (falseLeadEvent) {
-      setSelectedEventId(falseLeadEvent.id);
-      setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
+      // Auto-select false lead or root cause to showcase kernel immediately
+      const falseLeadEvent = result.incident.events.find((e) => e.type === 'FALSE_LEAD');
+      if (falseLeadEvent) {
+        setSelectedEventId(falseLeadEvent.id);
+        setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
+      }
+    } catch (err: unknown) {
+      setStatus('idle');
+      setIncident(null);
+      setVerification(null);
+      if (err instanceof SynthesisError) {
+        setWarningMessage(err.message);
+      } else {
+        console.error('Unexpected synthesis error:', err);
+        setWarningMessage('An unexpected error occurred during incident synthesis. Please check the developer console.');
+      }
     }
   };
 
-  // Synthesize timeline with pre-validation
+  // Synthesize timeline with pre-validation and blocking reason checks
   const handleSynthesize = () => {
     const validation = validateInputLogs(rawLog);
     if (!validation.isValid) {
       setWarningMessage(validation.error || 'Invalid input logs.');
+      return;
+    }
+
+    const blockingReason = getBlockingReason(rawLog, getStoredAISettings());
+    if (blockingReason) {
+      setWarningMessage(blockingReason);
       return;
     }
 
@@ -90,6 +117,7 @@ export const App: React.FC = () => {
   const handleClear = () => {
     setRawLog('');
     setIncident(null);
+    setVerification(null);
     setStatus('idle');
     setWarningMessage(null);
     setSelectedEventId(null);
@@ -119,6 +147,15 @@ export const App: React.FC = () => {
         activePresetId={activePresetId}
         activeMode={activeMode}
       />
+
+      {/* One-Line Plain-English Intro (visible until results are on screen) */}
+      {status !== 'success' && (
+        <div className="bg-slate-900/70 border-b border-slate-800 px-4 py-2 text-xs text-slate-300 font-sans flex items-center justify-between shrink-0 animate-fadeIn">
+          <p className="truncate">
+            Paste an outage chat or load a sample. IncidentLens builds the timeline, flags the wrong turns the team took, and shows what they cost.
+          </p>
+        </div>
+      )}
 
       {/* Main Two-Pane Workplace */}
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden">
@@ -173,6 +210,33 @@ export const App: React.FC = () => {
                     <span>Postmortem Markdown</span>
                   </button>
                 </div>
+
+                {/* Grounding Verification Badge */}
+                {verification && (
+                  <div
+                    title={
+                      verification.warnings.length > 0
+                        ? verification.warnings.join('\n')
+                        : 'All milestones verified against source log timestamps.'
+                    }
+                    className={`text-xs font-mono px-2.5 py-1 rounded-md border flex items-center space-x-1.5 transition-colors cursor-help ${
+                      verification.grounded === verification.total
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                        : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        verification.grounded === verification.total
+                          ? 'bg-emerald-400'
+                          : 'bg-amber-400'
+                      }`}
+                    />
+                    <span>
+                      {verification.grounded}/{verification.total} milestones traced to log lines
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* View Container */}
@@ -187,7 +251,10 @@ export const App: React.FC = () => {
                   </div>
                 ) : (
                   <div key="postmortem-view" className="h-full animate-view-fade">
-                    <PostmortemView incident={incident} />
+                    <PostmortemView
+                      incident={incident}
+                      verification={verification ?? undefined}
+                    />
                   </div>
                 )}
               </div>
