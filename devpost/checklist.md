@@ -59,6 +59,24 @@ Build mode: fast
   Learner check: Open settings, check the API key drawer and offline badge status, test synthesizing custom logs.
   Commit: `Add configurable live LLM synthesis with seamless offline fallback`
 
+- [ ] **6. Honest analysis and verification**
+  Becomes usable: The system guarantees honest boundaries and verified grounding: Sample mode strictly analyzes only the 3 built-in sample incidents (with clear inline guidance for custom logs); live AI prompts for line numbers and verifies line existence + timestamp matching; UI displays a computed "N/M milestones traced to log lines" badge; and failed API calls surface specific diagnostics without silent canned data substitution.
+  Why now: SRE trust requirement—reviewers and evaluators must be confident that milestones are rigorously grounded in the raw log and not hallucinated or quietly mocked.
+  PRD ref: `prd.md > Features and Behavior > 5. Honest Analysis & Verifiable Traceability (Slice 6)`, `prd.md > Decision Log`
+  Spec ref: `spec.md > Slice 6: Honest Analysis and Verification`, `spec.md > Decisions and Open Issues`
+  Build:
+    - [ ] Sample mode boundary: When no API key is present, analyze ONLY the 3 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 3 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
+    - [ ] Remove the generic offline synthesizer that invents events for arbitrary logs (superseding "Deterministic Offline Fallback").
+    - [ ] Surface specific error diagnostics for live API failures (bad key, rate limit, network, invalid JSON) with zero silent fallback to canned data.
+    - [ ] Live prompt numbers log lines and instructs the model to cite line numbers; add verify step checking that cited lines exist and milestone timestamp matches a cited line within 1 minute; compute false lead time lost and triage ratio deterministically from timestamps.
+    - [ ] Update UI to display `"N/M milestones traced to log lines"` computed by verify step, retiring the old `[Audit Ready]` wording.
+    - [ ] Update engine badge states: `"Sample mode"`, `"Live AI ready"`, `"Live AI"`; remove Gemini option from settings; remove `"v0.1.0-poc"` chip.
+    - [ ] Update RawLogEditor inspect view to use `text-left` instead of `text-justify`.
+    - [ ] Add a one-line plain-English intro banner above the two panes until an incident result is on screen.
+  Verify (mechanical): Run `npm run build` with zero errors; test custom log in Sample mode to verify amber banner blocks synthesis; test live API error surfacing without silent fallback; verify line citation and timestamp matching logic; confirm badge reads "N/M milestones traced to log lines" and inspect view is text-left.
+  Learner check: Paste a custom log in Sample mode, observe amber banner; switch to a preset and verify "N/M milestones traced to log lines"; check engine badge states.
+  Commit: `feat: implement honest analysis, verification step, and sample mode boundaries (Slice 6)`
+
 ## Hands-on Checkpoints
 
 - [x] Early usable behavior explored — Slice 1 (core timeline kernel and demo incident synthesis running end-to-end)
@@ -89,5 +107,12 @@ Activity mode: live app and editor with interactive `devpost/app-map.html` compa
 - Implemented Multi-Scenario Preset Selector with 2 realistic presets: "Flash Sale 504s" (Connection pool exhaustion; Redis detour) and "Database Deadlock" (Exclusive table lock; DDoS false alarm).
 - Added Timeline Milestone Filter Bar (`[All Milestones]`, `[Root Cause & Alerts Only]`, `[False Leads Only]`) dynamically isolating matching events.
 - Added One-Click Jira/GitHub Task Export formatting remediation action items into clean markdown task checklists with priority tags.
+
+## Decision Log
+
+### Oct 19, 2026 — Honest Analysis and Grounding Verification (Slice 6)
+- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an OpenAI API key, or with an invalid key.
+- **Decision:** Remove the generic offline synthesizer that invented arbitrary events for custom logs, and restrict Sample mode strictly to the built-in sample incidents. Require an API key for custom logs, explicitly surface API errors without silent fallback, and deterministically verify all cited line numbers and timestamps.
+- **Reasoning:** Fabricating synthetic events for arbitrary logs directly contradicts IncidentLens's core promise—that every single milestone is rigorously grounded in and auditable against the source log. Grounding verification and truthful error boundaries build authentic engineering trust.
 
 

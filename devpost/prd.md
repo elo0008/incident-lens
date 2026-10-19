@@ -72,19 +72,39 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
   - [ ] Toggle switch allows inspecting rendered markdown directly in the right pane.
   - [ ] Clicking "Copy Markdown" writes the raw markdown to clipboard and temporarily flashes visual confirmation.
 
+### 5. Honest Analysis & Verifiable Traceability (Slice 6)
+- As an SRE or evaluator testing IncidentLens, I want guaranteed truth in advertising and strict verification so that custom logs are never given fabricated output and every milestone is genuinely traced to source lines.
+  - [ ] **Sample Mode Boundary:** When no API key is provided, the app operates strictly in "Sample mode" and analyzes ONLY the built-in sample incidents. Pasting any unrecognized/custom log displays an inline amber warning banner: *"Sample mode only analyzes the 3 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."* Synthesis is blocked immediately—no timeline is generated and no loading card is shown.
+  - [ ] **Removal of Synthetic Generator:** The generic offline synthesizer that invented arbitrary events for custom logs is permanently removed (superseding the earlier "Deterministic Offline Fallback" decision).
+  - [ ] **Explicit API Error Surfaces:** A failed live API call displays a specific, informative error message (bad key, rate limit, network failure, or invalid JSON). It never silently falls back to canned or invented data.
+  - [ ] **Numbered Line Prompting & Verification Engine:** The live AI prompt numbers each log line and instructs the model to cite exact line numbers for each event. A verification step verifies every milestone: cited line numbers must exist in the raw log, and the milestone timestamp must match a cited line within 1 minute.
+  - [ ] **Deterministic Metric Calculation:** Time lost for false leads and overall triage efficiency ratios are calculated directly from verified milestone timestamps, rather than taken blindly from model text.
+  - [ ] **Grounded Traceability Badge:** The UI displays a live verification badge: `N/M milestones traced to log lines` computed by the verify step. The old generic `[Audit Ready]` wording is retired.
+  - [ ] **Engine Badge Accuracy & UI Cleanup:** Engine badge explicitly shows one of three states: *"Sample mode"*, *"Live AI ready"*, or *"Live AI"*. The obsolete `"v0.1.0-poc"` tag is removed. The Gemini provider option is removed from Settings to reflect the active OpenAI implementation.
+  - [ ] **Left-Aligned Inspect View:** RawLogEditor inspect view enforces `text-left` alignment (retiring `text-justify`) for clean monospace log scanning.
+  - [ ] **Plain-English Intro Banner:** A one-line plain-English explainer sits above the two panes until an incident synthesis result is actively displayed on screen.
+
 ## States and Boundaries
 
 - **Empty State:** Left pane contains empty textarea with guide placeholder. Right pane shows dashed timeline skeleton with "No incident loaded" message and clickable demo button.
 - **Loading / In-Flight State:** Left textarea is locked. "Synthesize Timeline" button displays spinning indicator. Right pane shows active 3-stage progress pulse with clear descriptive steps.
 - **Success State:** Timeline renders fully populated with summary metrics, interactive nodes, and active view switcher.
 - **Input Error State:** If text is invalid (under 3 lines or zero timestamps), displays a clear amber warning banner above the left pane: *"Unable to detect chronological timestamps. Please include timestamps (e.g., 14:02 UTC) or load a sample incident."* Raw text is preserved; no API call is triggered.
-- **API Failure / Fallback State:** If the LLM request encounters a network or parsing failure, the UI surfaces a graceful error banner with an option to *"Use Pre-synthesized IncidentLens Demo Data"* to guarantee an uninterrupted demo experience.
+- **Sample Mode Custom Log Boundary State:** In Sample mode (no API key), pasting custom logs displays an amber banner directing the user to add an OpenAI API key in Settings, with no loading pulse or fake timeline generation.
+- **API Failure State:** If a live LLM request fails (bad key, 429 rate limit, network down, invalid JSON), displays a specific diagnostic error banner explaining the exact failure. It never silently falls back to canned data.
 
 ## Product Decisions
 - **Two-Pane Fixed Layout:** Chosen over a multi-page or wizard flow to keep the input logs and synthesized output directly visible side-by-side.
 - **Pre-Validation on Client:** Checking for timestamp patterns before calling the LLM prevents wasted latency and confusing LLM hallucinations on blank/garbage input.
 - **Traceability via Line Highlighting:** Prioritizing source-linking builds immediate trust with skeptical SREs who require verifiable audit trails.
-- **Offline Demo Fallback:** Providing deterministic pre-synthesized fallback data ensures the 60-second video recording and judge evaluation will never break due to third-party API rate limits or latency spikes.
+- **Sample Mode for Built-In Incidents Only:** Preserves 100% dependable zero-key demonstrations using verified sample incidents, while establishing honest boundaries for arbitrary user inputs.
+
+## Decision Log
+
+### Oct 19, 2026 — Honest Analysis Over Fabricated Fallbacks
+- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an OpenAI API key, or with an invalid key.
+- **Decision:** Remove the generic offline synthesizer that invented arbitrary events for custom logs, and restrict Sample mode strictly to the built-in sample incidents. When a live API call fails, display the specific error rather than silently falling back to canned data.
+- **Reasoning:** Fabricating synthetic events for arbitrary logs directly contradicts IncidentLens's core promise—that every milestone is genuinely grounded in the source log. Grounding verification and truthful failure modes build authentic engineering trust.
 
 ## What We're Building
 - Single-page React/Vite/Tailwind dashboard with two-pane layout.

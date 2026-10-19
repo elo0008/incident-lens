@@ -187,23 +187,73 @@ incident-lens/
 ```
 
 ## External Services and Dependencies
-- **OpenAI / Gemini Completion Endpoint (Optional):**
-  - Endpoint: Standard chat completions (`/v1/chat/completions` or Gemini equivalent)
-  - Payload: Prompt with raw incident text and JSON schema instruction.
+- **OpenAI Completion Endpoint (Optional for Custom Logs):**
+  - Endpoint: Standard chat completions (`https://api.openai.com/v1/chat/completions`)
+  - Model: Default `gpt-4o-mini`
+  - Payload: Numbered raw incident text (`[L1] ...`) with JSON schema instructions requesting explicit line citations for every milestone.
   - Response format: Strict JSON object.
-  - Fallback: Handled locally via `src/data/demoIncident.ts` without network dependency.
+
+## Slice 6: Honest Analysis and Verification
+
+### 1. Sample Mode Bounding & Guardrails
+- When no API key is present (`settings.apiKey` is empty), the application operates in **Sample mode**.
+- Synthesis is permitted ONLY for the 3 built-in sample incidents (e.g. Flash Sale 504s, Database Deadlock, and the default demo).
+- Any custom or unrecognized log text triggers an immediate inline amber warning banner in the editor:
+  `"Sample mode only analyzes the 3 built-in incidents. To analyze your own log, add an OpenAI API key in Settings (gear icon)."`
+- Execution halts immediately: no loading card is shown and no timeline is generated.
+
+### 2. Removal of Generic Synthetic Offline Generator
+- The arbitrary generator function (`generateOfflineSynthesis`), which previously invented fictional milestones for unrecognized logs, is completely removed.
+- This supersedes the earlier design decision *"Deterministic Offline Fallback"*.
+
+### 3. Explicit API Error Surfaces
+- When a live AI request fails, the application captures and surfaces the specific error reason directly to the user (e.g., *Invalid API Key*, *Rate Limit Exceeded [HTTP 429]*, *Network Unavailable*, or *Malformed JSON Response*).
+- The system never silently falls back to canned or invented data upon a live API failure.
+
+### 4. Line Numbered Prompting & Verification Engine
+- **Prompt Enhancement:** Before sending the raw log to OpenAI, lines are indexed and prepended with explicit line tags (`[L1]`, `[L2]`, ...). The prompt directs the model to cite the exact line numbers (e.g. `citedLines: [14, 15]`) for every extracted event.
+- **Verification Engine (`verifyMilestones`):**
+  - Iterates over each event produced by the model.
+  - Verifies that every cited line exists in the original log.
+  - Verifies that the milestone's timestamp matches the timestamp on at least one cited line within a 1-minute tolerance window.
+  - Derives `timeLostMinutes` for false leads and the overall `triageTimeRatio` deterministically from milestone timestamp math, rather than relying on model text generation.
+
+### 5. Verifiable Grounding Badge
+- The top header of `PostmortemView` replaces the static `[Audit Ready]` badge with a computed grounding badge:
+  `"N/M milestones traced to log lines"` (e.g. `7/7 milestones traced to log lines`).
+
+### 6. Engine Badge & UI Cleanup
+- Top navbar engine status displays one of three explicit states:
+  1. `"Sample mode"` (no API key configured)
+  2. `"Live AI ready"` (valid API key stored in settings)
+  3. `"Live AI"` (synthesis produced via live model response)
+- Settings drawer removes the Gemini model selector option, streamlining configuration strictly to OpenAI.
+- The obsolete `"v0.1.0-poc"` chip in the header is removed.
+
+### 7. Left-Aligned Inspect View Typography
+- In `RawLogEditor`, lines rendered in Inspect View use `text-left` alignment (retiring `text-justify`) to maintain natural monospace readability for logs.
+
+### 8. Plain-English Intro Header
+- A concise, one-line plain-English explainer banner sits prominently above the two panes whenever no synthesized result is on screen:
+  *"Paste raw incident chat & alerts or select a built-in sample to synthesize a verifiable SRE timeline and postmortem."*
 
 ## Important Failure Modes
 - **Input without timestamps or < 3 lines:** Client-side validator halts before network call; displays warning banner in `RawLogEditor`.
-- **API Network error or Rate Limit (429/500):** Automatically switches to verified demo fallback and surfaces an unobtrusive amber banner: *"Using verified demo synthesis due to API network error"*.
-- **Malformed JSON from LLM:** JSON parse catch block logs warning and displays retry option or switches to offline mode.
+- **Sample Mode with Custom Logs:** Client-side matcher detects unindexed log; halts and displays amber guidance banner directing user to Settings.
+- **API Network error or Rate Limit (429/500):** Surfaces specific diagnostic error alert; halts execution without silent canned data substitution.
+- **Malformed JSON from LLM:** Error handler surfaces explicit JSON parse failure and prompts for retry.
 
 ## What Was Simplified and Why
-- **Local Fallback Data** instead of mandatory backend proxy: Eliminates CORS and API key onboarding blockers for anyone cloning and running the repository.
-- **Client-side State** instead of a database: Keeps the app 100% lightweight and zero-maintenance.
-- **Pre-configured Flash Sale Scenario** instead of live Slack OAuth: Avoids setting up OAuth tokens and Slack apps while demonstrating the exact real-world SRE value.
+- **Sample Mode for Built-In Incidents Only:** Keeps the app 100% dependable for demo evaluations without risking fabricated inferences for unverified user logs.
+- **Direct OpenAI Integration:** Eliminates multi-provider complexity that was not backed by production endpoints.
+- **Client-Side Verification Step:** Guarantees auditability mathematically before presenting data to the user.
 
 ## Decisions and Open Issues
+
+### Decision Log — Oct 19, 2026: Honest Analysis and Source Grounding Verification
+- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an OpenAI API key, or with an invalid key.
+- **Decision:** Remove the generic offline synthesizer that invented arbitrary events for custom logs, and restrict Sample mode strictly to the built-in sample incidents. Require an API key for custom logs, explicitly surface API errors without silent fallback, and deterministically verify all cited line numbers and timestamps.
+- **Reasoning:** Fabricating synthetic events for arbitrary logs directly contradicts IncidentLens's core promise—that every single milestone is rigorously grounded in and auditable against the source log. Grounding verification and truthful error boundaries build authentic engineering trust.
+
 - **Strict JSON Schema vs. Unstructured Parsing:** Using a typed JSON schema ensures the UI can reliably render the timeline nodes, compute the time-spent ratio, and isolate false leads deterministically.
 - **Line Highlighting Mapping:** `synthesisService.ts` correlates `rawSnippet` text back to the input textarea's line index, enabling interactive bidirectional cross-pane inspection.
-- **Learner Clarification Resolved:** Ensured the architecture operates fully offline in "Demo Mode" out-of-the-box, fulfilling the learner's goal of building a clean, reliable, and complex agent project.
