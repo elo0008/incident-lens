@@ -25,7 +25,7 @@ const FLASH_SALE_RAW_LOG = `[14:02:11] @datadog-bot: ALERT [P1] - PaymentService
 [14:16:05] @alex_backend: Preparing script to flush non-critical session cache keys and scale to r6g.2xlarge.
 [14:19:20] @sarah_sre: Wait before flushing! Look at Redis latency metrics—p99 response time is 1.2ms. That is completely normal.
 [14:21:40] @alex_backend: Double checking... Wait, the memory usage is stable at 89% because maxmemory is configured to 90%. No OOM evictions.
-[14:22:15] @sarah_sre: Disproven: Redis is totally healthy. We lost 18 minutes on Redis. Let's look upstream at egress connections.
+[14:22:15] @sarah_sre: Disproven: Redis is totally healthy. We lost a lot of time on Redis. Let's look upstream at egress connections.
 [14:24:00] @marcus_oncall: Back to square one. Payment pods are still spewing 504s. Node event loop lag is 450ms!
 [14:25:30] @sarah_sre: Checking netstat on checkout-service-78f99-x2k41. TIME_WAIT connections to external IPs are maxed out (65k).
 [14:27:12] @sarah_sre: Inspecting outbound sockets... 92% of active sockets are hanging on api.fastpay-partner.net (fraud validation webhook).
@@ -38,15 +38,15 @@ const FLASH_SALE_RAW_LOG = `[14:02:11] @datadog-bot: ALERT [P1] - PaymentService
 [14:39:10] @datadog-bot: RECOVERY - PaymentService p99 latency returned to 340ms (below threshold 800ms)
 [14:41:00] @datadog-bot: RECOVERY - HTTP 504 error rate dropped to 0.04%
 [14:42:30] @sarah_sre: Latency nominal, 504s eliminated, all queued orders processing. Incident mitigated.
-[14:44:00] @marcus_oncall: Closing incident bridge at 14:44 UTC. Total duration: 42 minutes. Moving to postmortem timeline drafting.`;
+[14:44:00] @marcus_oncall: Closing incident bridge at 14:44 UTC. Moving to postmortem timeline drafting.`;
 
 const FLASH_SALE_SYNTHESIS: SynthesizedIncident = {
   executiveSummary: {
     title: "Payment Gateway 504 Spikes during Flash Sale",
-    impact: "12% of checkout transactions timed out over a 42-minute window during peak flash sale traffic.",
+    impact: "12% of checkout transactions timed out over a 40-minute window during peak flash sale traffic.",
     ttdMinutes: 3,
-    ttrMinutes: 42,
-    triageTimeRatio: 0.43 // 18m out of 42m spent in triage rabbit hole
+    ttrMinutes: 40,
+    triageTimeRatio: 0.43 // 17m out of 40m spent in triage rabbit hole
   },
   rootCause: {
     summary: "Third-party fraud verification webhook (FastPay) latency spiked to 8.5s. Uncapped 30s client timeout and fixed 500-connection socket pool exhausted all Node.js outbound connections, causing cascading 504 Gateway Timeouts across the checkout service.",
@@ -83,8 +83,8 @@ const FLASH_SALE_SYNTHESIS: SynthesizedIncident = {
       type: "FALSE_LEAD",
       summary: "False Lead: Investigated Redis cluster memory saturation and eviction thrashing.",
       rawSnippet: "[14:05:10] @marcus_oncall: Seeing elevated errors in stripe-proxy... Could it be Redis?",
-      timeLostMinutes: 18,
-      details: "Team suspected Redis cache thrashing due to 89% memory metric. Disproven at 14:22 UTC when latency metrics showed 1.2ms nominal response and stable maxmemory threshold. 18 minutes lost.",
+      timeLostMinutes: 17,
+      details: "Team suspected Redis cache thrashing due to 89% memory metric. Disproven at 14:22 UTC when latency metrics showed 1.2ms nominal response and stable maxmemory threshold. 17 minutes lost.",
       sourceLineIndices: [4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     },
     {
@@ -128,7 +128,7 @@ const FLASH_SALE_SYNTHESIS: SynthesizedIncident = {
       summary: "Incident Resolved: p99 latency returned to 340ms, 504 error rate dropped to 0.04%.",
       rawSnippet: "[14:42:30] @sarah_sre: Latency nominal, 504s eliminated, all queued orders processing. Incident mitigated.",
       timeLostMinutes: 0,
-      details: "Full resolution verified across all metrics. Bridge closed at 14:44 UTC. Total duration: 42 minutes.",
+      details: "Full resolution verified across all metrics. Resolved at 14:42 UTC, 40 minutes after the first alert; bridge closed at 14:44 UTC.",
       sourceLineIndices: [23, 24, 25, 26]
     }
   ],
@@ -153,9 +153,9 @@ const FLASH_SALE_SYNTHESIS: SynthesizedIncident = {
 
 **Incident Date:** 2026-10-18  
 **Severity:** P1 (Critical Outage)  
-**Duration:** 42 minutes (14:02 UTC – 14:44 UTC)  
+**Duration:** 40 minutes (14:02 UTC – 14:42 UTC)  
 **Time to Detect (TTD):** 3 minutes  
-**Time to Resolve (TTR):** 42 minutes  
+**Time to Resolve (TTR):** 40 minutes  
 **Triage Efficiency Ratio:** 43% of incident duration spent investigating false lead (Redis)
 
 ---
@@ -163,7 +163,7 @@ const FLASH_SALE_SYNTHESIS: SynthesizedIncident = {
 ## Executive Summary
 At 14:02 UTC, coinciding with the launch of the promotional Flash Sale (4x baseline traffic), the checkout service began experiencing severe latency degradation, with p99 response times climbing from 350ms to 4200ms and HTTP 504 Gateway Timeout rates peaking at 14.2%. 
 
-Initial triage spent 18 minutes investigating an alleged Redis memory exhaustion rabbit hole before network telemetry confirmed that outbound sockets were saturated by an upstream degradation at our third-party fraud validation provider (FastPay). Implementing an automated circuit breaker and reducing client timeouts to 1200ms restored nominal performance by 14:42 UTC.
+Initial triage spent 17 minutes investigating an alleged Redis memory exhaustion rabbit hole before network telemetry confirmed that outbound sockets were saturated by an upstream degradation at our third-party fraud validation provider (FastPay). Implementing an automated circuit breaker and reducing client timeouts to 1200ms restored nominal performance by 14:42 UTC.
 
 ---
 
@@ -180,8 +180,8 @@ Initial triage spent 18 minutes investigating an alleged Redis memory exhaustion
 |---|---|---|---|
 | **14:02** | \`CRITICAL_ALERT\` | PaymentService p99 > 4.2s alert fired | Datadog-Bot |
 | **14:03** | \`TRIAGE\` | Incident bridge established | @marcus_oncall |
-| **14:05** | \`FALSE_LEAD\` | **18m Lost:** Investigated Redis memory & evictions | @alex_backend (Disproven at 14:22) |
-| **14:25** | \`TRIAGE\` | Socket inspection revealed 65k hanging TIME_WAITs | @sarah_sre |
+| **14:05** | \`FALSE_LEAD\` | **17m Lost:** Investigated Redis memory & evictions | @alex_backend (Disproven at 14:22) |
+| **14:24** | \`TRIAGE\` | Socket inspection revealed 65k hanging TIME_WAITs | @sarah_sre |
 | **14:28** | \`ROOT_CAUSE\` | **Culprit Isolated:** FastPay webhook latency (8.5s) | @sarah_sre |
 | **14:31** | \`MITIGATION\` | Deployed 1200ms timeout & circuit breaker | @alex_backend |
 | **14:42** | \`RESOLUTION\` | Errors returned to 0.04%, p99 < 350ms | @sarah_sre |
@@ -210,7 +210,7 @@ const DB_DEADLOCK_RAW_LOG = `[09:12:05] @pagerduty-bot: [CRITICAL] Postgres orde
 [09:21:40] @dave_oncall: Checking origin ingress... Traffic dropped by 45%, but database locks are still climbing! Currently 5,200 waiting.
 [09:23:15] @sam_security: Still seeing 504s. The origin server CPU is completely idle at 12%. This doesn't behave like a volumetric DDoS.
 [09:25:30] @elena_db: Joining bridge. Looking directly at pg_stat_activity on order-db-primary.
-[09:27:10] @elena_db: Wait, this is NOT a DDoS! Cloudflare challenge was a false lead. We burned 15 minutes blocking legitimate customers.
+[09:27:10] @elena_db: Wait, this is NOT a DDoS! Cloudflare challenge was a false lead. We burned a lot of time blocking legitimate customers.
 [09:28:40] @elena_db: ROOT CAUSE FOUND: PID 89412 is running \`ALTER TABLE orders ADD COLUMN fulfillment_notes TEXT DEFAULT ''\`.
 [09:29:25] @elena_db: The migration acquired an AccessExclusiveLock without a lock_timeout. Every single INSERT and UPDATE is queued behind PID 89412!
 [09:30:50] @dave_oncall: Who ran that migration during morning peak hours?
@@ -221,15 +221,15 @@ const DB_DEADLOCK_RAW_LOG = `[09:12:05] @pagerduty-bot: [CRITICAL] Postgres orde
 [09:36:20] @sam_security: Disabling Cloudflare 'Under Attack' mode. Legitimate traffic resuming normally.
 [09:38:50] @datadog-bot: RECOVERY - API Gateway POST /v2/orders p99 latency dropped to 42ms
 [09:40:10] @pagerduty-bot: RESOLVED - Postgres order-db-primary write transaction lock count nominal (0 waiting)
-[09:41:00] @dave_oncall: All systems fully recovered. Zero dropped transactions; queued orders processed. Closing bridge at 09:41 UTC. Total duration: 31 minutes.`;
+[09:41:00] @dave_oncall: All systems fully recovered. Zero dropped transactions; queued orders processed. Closing bridge at 09:41 UTC.`;
 
 const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
   executiveSummary: {
     title: "Database Deadlock on Orders Table during Migration",
-    impact: "100% of order creation transactions blocked for 31 minutes; 15 minutes lost chasing DDoS false alarm.",
+    impact: "100% of order creation transactions blocked for 26 minutes; 12 minutes lost chasing DDoS false alarm.",
     ttdMinutes: 2,
-    ttrMinutes: 31,
-    triageTimeRatio: 0.48 // 15m out of 31m lost
+    ttrMinutes: 26,
+    triageTimeRatio: 0.46 // 12m out of 26m lost
   },
   rootCause: {
     summary: "Unindexed schema migration (ALTER TABLE orders) acquired an unbounded AccessExclusiveLock without a lock_timeout, cascading into a complete write-queue deadlock across 5,200 transactions. Misidentified initially as an external L7 DDoS attack.",
@@ -266,9 +266,9 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       type: "FALSE_LEAD",
       summary: "False Lead: Investigated Layer 7 DDoS attack; enabled Cloudflare 'Under Attack' JS challenge mode.",
       rawSnippet: "[09:15:10] @dave_oncall: Could we be under a Layer 7 DDoS flood targeting the orders endpoint?",
-      timeLostMinutes: 15,
-      details: "Security team misdiagnosed high connection queues as an external volumetric flood. Spent 15 minutes investigating WAF telemetry and challenging valid users while database deadlocks mounted. 15 minutes lost.",
-      sourceLineIndices: [4, 5, 6, 7, 8, 9]
+      timeLostMinutes: 12,
+      details: "Security team misdiagnosed high connection queues as an external volumetric flood. Spent 12 minutes investigating WAF telemetry and challenging valid users while database deadlocks mounted. 12 minutes lost.",
+      sourceLineIndices: [4, 5, 6, 7, 8, 9, 10, 11]
     },
     {
       id: "evt-db-4",
@@ -311,7 +311,7 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
       summary: "Incident Resolved: Write latencies returned to 42ms; lock count cleared to 0.",
       rawSnippet: "[09:38:50] @datadog-bot: RECOVERY - API Gateway POST /v2/orders p99 latency dropped to 42ms",
       timeLostMinutes: 0,
-      details: "Zero lost or corrupted orders; all queued transactions successfully committed. Bridge closed at 09:41 UTC. Total duration: 31 minutes.",
+      details: "Zero lost or corrupted orders; all queued transactions successfully committed. Resolved at 09:38 UTC, 26 minutes after the first alert; bridge closed at 09:41 UTC.",
       sourceLineIndices: [20, 21, 22]
     }
   ],
@@ -336,17 +336,17 @@ const DB_DEADLOCK_SYNTHESIS: SynthesizedIncident = {
 
 **Incident Date:** 2026-10-19  
 **Severity:** P1 (Critical Outage)  
-**Duration:** 31 minutes (09:12 UTC – 09:43 UTC)  
+**Duration:** 26 minutes (09:12 UTC – 09:38 UTC)  
 **Time to Detect (TTD):** 2 minutes  
-**Time to Resolve (TTR):** 31 minutes  
-**Triage Efficiency Ratio:** 48% of incident duration spent investigating false lead (Cloudflare DDoS)
+**Time to Resolve (TTR):** 26 minutes  
+**Triage Efficiency Ratio:** 46% of incident duration spent investigating false lead (Cloudflare DDoS)
 
 ---
 
 ## Executive Summary
 At 09:12 UTC, Postgres database telemetry alerted on severe write transaction queuing on \`order-db-primary\`, with over 4,500 queries stalled and API Gateway POST latency breaching 28.5 seconds. 
 
-Initial triage misdiagnosed the incoming connection buildup as an external Layer 7 DDoS attack, burning 15 minutes enabling strict Cloudflare challenges. Subsequent database telemetry isolated the true root cause: an unindexed schema migration triggered by an automated inventory-sync deployment held an unbounded \`AccessExclusiveLock\` on the orders table. Terminating the blocking migration PID cleared the 5,200 transaction backlog within 30 seconds and fully restored nominal latencies.
+Initial triage misdiagnosed the incoming connection buildup as an external Layer 7 DDoS attack, burning 12 minutes enabling strict Cloudflare challenges. Subsequent database telemetry isolated the true root cause: an unindexed schema migration triggered by an automated inventory-sync deployment held an unbounded \`AccessExclusiveLock\` on the orders table. Terminating the blocking migration PID cleared the 5,200 transaction backlog within 30 seconds and fully restored nominal latencies.
 
 ---
 
@@ -363,7 +363,7 @@ Initial triage misdiagnosed the incoming connection buildup as an external Layer
 |---|---|---|---|
 | **09:12** | \`CRITICAL_ALERT\` | Postgres write locks > 4,500 alert fired | PagerDuty-Bot |
 | **09:13** | \`TRIAGE\` | Incident bridge established; API latencies stall | @dave_oncall |
-| **09:15** | \`FALSE_LEAD\` | **15m Lost:** Investigated L7 DDoS; enabled Cloudflare challenges | @sam_security (Disproven at 09:27) |
+| **09:15** | \`FALSE_LEAD\` | **12m Lost:** Investigated L7 DDoS; enabled Cloudflare challenges | @sam_security (Disproven at 09:27) |
 | **09:25** | \`TRIAGE\` | pg_stat_activity reveals 5,200 queries waiting on table lock | @elena_db |
 | **09:28** | \`ROOT_CAUSE\` | **Culprit Isolated:** Unindexed ALTER TABLE held AccessExclusiveLock | @elena_db |
 | **09:32** | \`MITIGATION\` | Terminated PID 89412 via pg_terminate_backend | @elena_db |
