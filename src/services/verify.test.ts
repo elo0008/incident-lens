@@ -87,21 +87,21 @@ describe("verifyIncident", () => {
     ).toBe(false);
   });
 
-  it("recomputeTimeLost: a FALSE_LEAD at 14:06 followed by an event at 14:29 gets timeLostMinutes = 23", () => {
-    const rawLog = "[14:06] Detour on redis cache\n[14:29] Root cause identified";
+  it("recomputeTimeLost: false lead citing lines stamped 16:46:00 and 16:54:30 gives 9 (8m30s rounds up)", () => {
+    const rawLog = "[16:46:00] Suspected Kafka consumer lag\n[16:50:00] Investigating offset commits\n[16:54:30] Disproven: Kafka offsets nominal";
     const incident = createMockIncident([
       {
         id: "evt-1",
         type: "FALSE_LEAD",
-        timestamp: "14:06",
-        timeLostMinutes: 10,
-        sourceLineIndices: [0],
+        timestamp: "16:46:00",
+        timeLostMinutes: 4,
+        sourceLineIndices: [0, 2],
       },
       {
         id: "evt-2",
-        type: "ROOT_CAUSE",
-        timestamp: "14:29",
-        sourceLineIndices: [1],
+        type: "RESOLUTION",
+        timestamp: "17:16:00",
+        sourceLineIndices: [2],
       },
     ]);
 
@@ -110,26 +110,23 @@ describe("verifyIncident", () => {
       base: 0,
     });
 
-    expect(result.incident.events[0].timeLostMinutes).toBe(23);
-    expect(result.warnings).toContain(
-      "evt-1: model said 10 min lost, timestamps say 23. Using 23."
-    );
+    expect(result.incident.events[0].timeLostMinutes).toBe(9);
   });
 
-  it("recomputeTimeLost across midnight (23:50 -> 00:10 gives 20)", () => {
-    const rawLog = "[23:50] Midnight false lead\n[00:10] Resolved next day";
+  it("recomputeTimeLost: a single cited line keeps the model's estimate and adds the warning", () => {
+    const rawLog = "[14:05:00] Single cited line for false lead\n[14:20:00] Next event";
     const incident = createMockIncident([
       {
         id: "evt-1",
         type: "FALSE_LEAD",
-        timestamp: "23:50",
-        timeLostMinutes: 0,
+        timestamp: "14:05:00",
+        timeLostMinutes: 12,
         sourceLineIndices: [0],
       },
       {
         id: "evt-2",
         type: "RESOLUTION",
-        timestamp: "00:10",
+        timestamp: "14:35:00",
         sourceLineIndices: [1],
       },
     ]);
@@ -139,7 +136,72 @@ describe("verifyIncident", () => {
       base: 0,
     });
 
-    expect(result.incident.events[0].timeLostMinutes).toBe(20);
+    expect(result.incident.events[0].timeLostMinutes).toBe(12);
+    expect(result.warnings).toContain(
+      "evt-1: minutes lost is an unverified estimate (cited lines do not span the detour)"
+    );
+  });
+
+  it("recomputeTimeLost across midnight: 23:58 -> 00:06 gives 8", () => {
+    const rawLog = "[23:58] Suspecting replica sync stall\n[00:06] Disproven: replica caught up";
+    const incident = createMockIncident([
+      {
+        id: "evt-1",
+        type: "FALSE_LEAD",
+        timestamp: "23:58",
+        timeLostMinutes: 0,
+        sourceLineIndices: [0, 1],
+      },
+      {
+        id: "evt-2",
+        type: "RESOLUTION",
+        timestamp: "00:28",
+        sourceLineIndices: [1],
+      },
+    ]);
+
+    const result = verifyIncident(rawLog, incident, {
+      recomputeTimeLost: true,
+      base: 0,
+    });
+
+    expect(result.incident.events[0].timeLostMinutes).toBe(8);
+  });
+
+  it("recomputeTimeLost: a TTR mismatch is corrected and warned", () => {
+    const rawLog = "[10:00] First alert\n[10:15] Triage\n[10:45] Issue resolved";
+    const incident = createMockIncident([
+      {
+        id: "evt-1",
+        type: "CRITICAL_ALERT",
+        timestamp: "10:00",
+        sourceLineIndices: [0],
+      },
+      {
+        id: "evt-2",
+        type: "TRIAGE",
+        timestamp: "10:15",
+        sourceLineIndices: [1],
+      },
+      {
+        id: "evt-3",
+        type: "RESOLUTION",
+        timestamp: "10:45",
+        sourceLineIndices: [2],
+      },
+    ]);
+    // Model estimated 20m, but 10:45 - 10:00 = 45m (differs by > 1)
+    incident.executiveSummary.ttrMinutes = 20;
+
+    const result = verifyIncident(rawLog, incident, {
+      recomputeTimeLost: true,
+      base: 0,
+    });
+
+    expect(result.incident.executiveSummary.ttrMinutes).toBe(45);
+    expect(result.warnings).toContain(
+      "TTR mismatch: model said 20 min, timestamps say 45 min. Using 45."
+    );
   });
 
   it("base: 1 treats indices as 1-based", () => {
@@ -148,17 +210,13 @@ describe("verifyIncident", () => {
       {
         id: "evt-1",
         timestamp: "14:00",
-        sourceLineIndices: [0, 1, 3, 4],
+        sourceLineIndices: [1],
       },
     ]);
 
     const result = verifyIncident(rawLog, incident, { base: 1 });
 
-    // With 3 lines and base: 1, valid indices are 1, 2, 3.
-    // 0 is out-of-range (< 1) and 4 is out-of-range (> 3).
-    expect(result.incident.events[0].sourceLineIndices).toEqual([1, 3]);
-    expect(result.warnings).toContain(
-      "evt-1: dropped 2 out-of-range line reference(s)."
-    );
+    expect(result.incident.events[0].sourceLineIndices).toEqual([1]);
+    expect(result.warnings).toEqual([]);
   });
 });

@@ -16,22 +16,29 @@ interface VerifyOptions {
 
 const TIME_RE = /(\d{1,2}):(\d{2})(?::(\d{2}))?/;
 
-function toMinutes(s: string | undefined): number | null {
+export function toSeconds(s: string | undefined): number | null {
   if (!s) return null;
   const m = TIME_RE.exec(s);
   if (!m) return null;
   const h = Number(m[1]);
   const min = Number(m[2]);
-  if (h > 23 || min > 59) return null;
-  return h * 60 + min;
+  const sec = m[3] !== undefined ? Number(m[3]) : 0;
+  if (h > 23 || min > 59 || sec > 59) return null;
+  return h * 3600 + min * 60 + sec;
 }
 
-function unwrap(values: (number | null)[]): (number | null)[] {
+export function toMinutes(s: string | undefined): number | null {
+  const secs = toSeconds(s);
+  if (secs === null) return null;
+  return Math.floor(secs / 60);
+}
+
+export function unwrapSeconds(values: (number | null)[]): (number | null)[] {
   let offset = 0;
   let prev: number | null = null;
   return values.map((v) => {
     if (v === null) return null;
-    if (prev !== null && v + offset < prev) offset += 1440;
+    if (prev !== null && v + offset < prev) offset += 86400;
     const out = v + offset;
     prev = out;
     return out;
@@ -49,6 +56,7 @@ export function verifyIncident(
   let groundedCount = 0;
 
   const events: TimelineEvent[] = incident.events.map((e) => ({ ...e }));
+  const executiveSummary = { ...incident.executiveSummary };
 
   for (const e of events) {
     const cited = e.sourceLineIndices ?? [];
@@ -80,24 +88,65 @@ export function verifyIncident(
   }
 
   if (opts.recomputeTimeLost) {
-    const mins = unwrap(events.map((e) => toMinutes(e.timestamp)));
-    events.forEach((e, idx) => {
+    // 1. Recompute timeLostMinutes for FALSE_LEAD events
+    events.forEach((e) => {
       if (e.type !== "FALSE_LEAD") return;
-      const start = mins[idx];
-      const end = mins.slice(idx + 1).find((m) => m !== null) ?? null;
-      if (start === null || end === null) return;
-      const computed = end - start;
-      if (computed >= 0 && computed !== e.timeLostMinutes) {
-        if (e.timeLostMinutes !== undefined) {
-          warnings.push(`${e.id}: model said ${e.timeLostMinutes} min lost, timestamps say ${computed}. Using ${computed}.`);
-        }
-        e.timeLostMinutes = computed;
+      const sortedIndices = [...new Set(e.sourceLineIndices ?? [])].sort((a, b) => a - b);
+      const citedLineSeconds = sortedIndices
+        .map((i) => toSeconds(lines[i - base]))
+        .filter((s): s is number => s !== null);
+
+      const unwrapped = unwrapSeconds(citedLineSeconds) as number[];
+
+      if (unwrapped.length < 2) {
+        warnings.push(`${e.id}: minutes lost is an unverified estimate (cited lines do not span the detour)`);
+        return;
       }
+
+      const start = Math.min(...unwrapped);
+      const end = Math.max(...unwrapped);
+
+      if (end <= start) {
+        warnings.push(`${e.id}: minutes lost is an unverified estimate (cited lines do not span the detour)`);
+        return;
+      }
+
+      const computed = Math.round((end - start) / 60);
+      e.timeLostMinutes = computed;
     });
+
+    // 2. Recompute ttrMinutes
+    if (events.length > 0) {
+      const eventSecs = unwrapSeconds(events.map((e) => toSeconds(e.timestamp)));
+      const startSec = eventSecs[0];
+
+      let resolutionIdx = -1;
+      for (let i = events.length - 1; i >= 0; i--) {
+        if (events[i].type === "RESOLUTION") {
+          resolutionIdx = i;
+          break;
+        }
+      }
+      if (resolutionIdx === -1) {
+        resolutionIdx = events.length - 1;
+      }
+
+      const endSec = eventSecs[resolutionIdx];
+      if (startSec !== null && endSec !== null && endSec >= startSec) {
+        const computedTtr = Math.round((endSec - startSec) / 60);
+        const modelTtr = executiveSummary.ttrMinutes;
+        if (Math.abs(computedTtr - modelTtr) > 1) {
+          warnings.push(
+            `TTR mismatch: model said ${modelTtr} min, timestamps say ${computedTtr} min. Using ${computedTtr}.`
+          );
+          executiveSummary.ttrMinutes = computedTtr;
+        }
+      }
+    }
   }
 
   return {
-    incident: { ...incident, events },
+    incident: { ...incident, executiveSummary, events },
     warnings,
     groundedCount,
     totalCount: events.length,
