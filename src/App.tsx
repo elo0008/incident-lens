@@ -28,6 +28,7 @@ export const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('timeline');
   const [activeMode, setActiveMode] = useState<'offline_verified' | 'live_ai'>('offline_verified');
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  const [activeResultModel, setActiveResultModel] = useState<string | null>(null);
 
   const handleRawLogChange = (newVal: string) => {
     setRawLog(newVal);
@@ -47,6 +48,7 @@ export const App: React.FC = () => {
     // Explicitly reset right pane to idle (do not trigger synthesis)
     setIncident(null);
     setVerification(null);
+    setActiveResultModel(null);
     setStatus('idle');
     setWarningMessage(null);
     setSelectedEventId(null);
@@ -76,6 +78,7 @@ export const App: React.FC = () => {
       setIncident(result.incident);
       setVerification(result.verification);
       setActiveMode(result.mode);
+      setActiveResultModel(result.model);
       setStatus('success');
 
       // Auto-select false lead or root cause to showcase kernel immediately
@@ -88,6 +91,7 @@ export const App: React.FC = () => {
       setStatus('idle');
       setIncident(null);
       setVerification(null);
+      setActiveResultModel(null);
       if (err instanceof SynthesisError) {
         setWarningMessage(err.message);
       } else {
@@ -118,6 +122,7 @@ export const App: React.FC = () => {
     setRawLog('');
     setIncident(null);
     setVerification(null);
+    setActiveResultModel(null);
     setStatus('idle');
     setWarningMessage(null);
     setSelectedEventId(null);
@@ -146,6 +151,7 @@ export const App: React.FC = () => {
         status={status}
         activePresetId={activePresetId}
         activeMode={activeMode}
+        activeResultModel={activeResultModel}
       />
 
       {/* One-Line Plain-English Intro (visible until results are on screen) */}
@@ -247,6 +253,7 @@ export const App: React.FC = () => {
                       incident={incident}
                       selectedEventId={selectedEventId}
                       onSelectEvent={handleSelectEvent}
+                      mode={activeMode}
                     />
                   </div>
                 ) : (

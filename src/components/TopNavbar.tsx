@@ -28,13 +28,15 @@ interface TopNavbarProps {
   status: SynthesisStatus;
   activePresetId: string | null;
   activeMode: 'offline_verified' | 'live_ai';
+  activeResultModel?: string | null;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
   onSelectPreset,
   status,
   activePresetId,
-  activeMode
+  activeMode,
+  activeResultModel
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState<boolean>(false);
@@ -80,6 +82,15 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
   // Compute engine badge display and tooltip
   const getEngineBadge = () => {
+    if (activeResultModel === 'built-in') {
+      return {
+        label: 'Sample result · stored and verified',
+        tooltip: 'This result comes from a built-in sample incident, not a live AI call',
+        style: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300',
+        icon: ShieldCheck,
+        iconColor: 'text-emerald-400'
+      };
+    }
     if (!hasApiKey) {
       return {
         label: `Sample mode · ${DEMO_PRESETS.length} built-in incidents`,
@@ -90,9 +101,13 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
       };
     }
     if (activeMode === 'live_ai') {
+      const displayModel = activeResultModel || settings.model;
+      const isFallback = Boolean(activeResultModel && activeResultModel !== settings.model);
       return {
-        label: `Live AI · ${settings.model}`,
-        tooltip: `Synthesized using live Gemini ${settings.model}.`,
+        label: `Live AI · ${displayModel}`,
+        tooltip: isFallback
+          ? `Primary model was busy; answered by ${displayModel}`
+          : `Synthesized using live Gemini ${displayModel}.`,
         style: 'bg-cyan-500/10 border-cyan-500/40 text-cyan-300',
         icon: Zap,
         iconColor: 'text-cyan-400'

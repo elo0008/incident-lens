@@ -34,6 +34,15 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
   const lineCount = lines.length;
   const charCount = rawLog.length;
 
+  const highlightKey = highlightedLineIndices.join(',');
+
+  // Switch to Inspect view automatically whenever highlightedLineIndices changes to a non-empty array
+  useEffect(() => {
+    if (highlightedLineIndices.length > 0) {
+      setIsEditing(false);
+    }
+  }, [highlightKey]);
+
   // Auto-scroll to first highlighted line in Inspect mode
   useEffect(() => {
     if (highlightedLineIndices.length > 0 && highlightedRef.current) {
@@ -42,7 +51,7 @@ export const RawLogEditor: React.FC<RawLogEditorProps> = ({
         block: 'center'
       });
     }
-  }, [highlightedLineIndices]);
+  }, [highlightKey]);
 
   // If user clears the log, revert to edit mode
   useEffect(() => {

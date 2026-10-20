@@ -4,9 +4,10 @@ import { ExecutiveSummary } from '../types/incident';
 
 interface TriageEfficiencyBarProps {
   summary: ExecutiveSummary;
+  mode?: 'offline_verified' | 'live_ai';
 }
 
-export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summary }) => {
+export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summary, mode }) => {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -39,10 +40,15 @@ export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summar
 
         {/* Quick SRE KPI Badges */}
         <div className="flex items-center space-x-3 text-xs font-mono">
-          <div className="bg-slate-950/70 border border-slate-800 px-2.5 py-1 rounded flex items-center space-x-1.5">
+          <div
+            className="bg-slate-950/70 border border-slate-800 px-2.5 py-1 rounded flex items-center space-x-1.5"
+            title={mode === 'live_ai' ? 'Estimated by the AI from the log, not computed from timestamps' : undefined}
+          >
             <Clock className="w-3.5 h-3.5 text-cyan-400" />
             <span className="text-slate-400">TTD:</span>
-            <span className="text-slate-200 font-semibold">{summary.ttdMinutes}m</span>
+            <span className="text-slate-200 font-semibold">
+              {mode === 'live_ai' ? `~${summary.ttdMinutes}m` : `${summary.ttdMinutes}m`}
+            </span>
           </div>
           <div className="bg-slate-950/70 border border-slate-800 px-2.5 py-1 rounded flex items-center space-x-1.5">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
@@ -57,11 +63,11 @@ export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summar
         <div className="flex items-center justify-between text-[11px] font-mono">
           <span className="text-amber-400/90 flex items-center space-x-1.5 font-medium">
             <Hourglass className="w-3.5 h-3.5 text-amber-400" />
-            <span>Triage & Red Herrings: {triageMinutes} mins ({triagePercent}%)</span>
+            <span>Lost on wrong turns: {triageMinutes} mins ({triagePercent}%)</span>
           </span>
           <span className="text-emerald-400/90 flex items-center space-x-1.5 font-medium">
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Active Remediation: {remediationMinutes} mins ({remediationPercent}%)</span>
+            <span>Rest of the incident: {remediationMinutes} mins ({remediationPercent}%)</span>
           </span>
         </div>
 
@@ -70,12 +76,12 @@ export const TriageEfficiencyBar: React.FC<TriageEfficiencyBarProps> = ({ summar
           <div
             style={{ width: mounted ? `${triagePercent}%` : '0%' }}
             className="h-full bg-gradient-to-r from-amber-500 to-amber-600 transition-all duration-700 ease-out relative group cursor-help"
-            title={`Triage & Rabbit Holes: ${triageMinutes} mins (${triagePercent}%)`}
+            title={`Lost on wrong turns: ${triageMinutes} mins (${triagePercent}%)`}
           />
           <div
             style={{ width: mounted ? `${remediationPercent}%` : '0%' }}
             className="h-full bg-gradient-to-r from-emerald-600 to-cyan-500 transition-all duration-700 ease-out relative group cursor-help"
-            title={`Remediation & Fix Verification: ${remediationMinutes} mins (${remediationPercent}%)`}
+            title={`Rest of the incident: ${remediationMinutes} mins (${remediationPercent}%)`}
           />
         </div>
 

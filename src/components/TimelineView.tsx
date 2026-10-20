@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { SynthesizedIncident, TimelineEvent } from '../types/incident';
 import { TriageEfficiencyBar } from './TriageEfficiencyBar';
 import { TimelineNodeCard } from './TimelineNodeCard';
-import { AlertCircle, Filter, Sparkles, Target } from 'lucide-react';
+import { AlertCircle, Filter, Target } from 'lucide-react';
 
 interface TimelineViewProps {
   incident: SynthesizedIncident;
   selectedEventId: string | null;
   onSelectEvent: (event: TimelineEvent) => void;
+  mode?: 'offline_verified' | 'live_ai';
 }
 
 type MilestoneFilter = 'all' | 'critical' | 'false_leads';
@@ -15,7 +16,8 @@ type MilestoneFilter = 'all' | 'critical' | 'false_leads';
 export const TimelineView: React.FC<TimelineViewProps> = ({
   incident,
   selectedEventId,
-  onSelectEvent
+  onSelectEvent,
+  mode
 }) => {
   const [filter, setFilter] = useState<MilestoneFilter>('all');
 
@@ -38,7 +40,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
   return (
     <div className="h-full flex flex-col bg-slate-950 overflow-hidden">
       {/* Top Triage Efficiency Bar */}
-      <TriageEfficiencyBar summary={incident.executiveSummary} />
+      <TriageEfficiencyBar summary={incident.executiveSummary} mode={mode} />
 
       {/* Scrollable Node Timeline */}
       <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
