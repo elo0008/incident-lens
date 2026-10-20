@@ -29,6 +29,7 @@ interface TopNavbarProps {
   activePresetId: string | null;
   activeMode: 'offline_verified' | 'live_ai';
   activeResultModel?: string | null;
+  hasActiveResult?: boolean;
 }
 
 export const TopNavbar: React.FC<TopNavbarProps> = ({
@@ -36,7 +37,8 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   status,
   activePresetId,
   activeMode,
-  activeResultModel
+  activeResultModel,
+  hasActiveResult
 }) => {
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isPresetMenuOpen, setIsPresetMenuOpen] = useState<boolean>(false);
@@ -82,7 +84,9 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
 
   // Compute engine badge display and tooltip
   const getEngineBadge = () => {
-    if (activeResultModel === 'built-in') {
+    const isResultActive = hasActiveResult ?? Boolean(activeResultModel);
+
+    if (isResultActive && activeResultModel === 'built-in') {
       return {
         label: 'Sample result · stored and verified',
         tooltip: 'This result comes from a built-in sample incident, not a live AI call',
@@ -100,7 +104,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
         iconColor: 'text-emerald-400'
       };
     }
-    if (activeMode === 'live_ai') {
+    if (isResultActive && activeMode === 'live_ai') {
       const displayModel = activeResultModel || settings.model;
       const isFallback = Boolean(activeResultModel && activeResultModel !== settings.model);
       return {

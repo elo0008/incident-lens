@@ -380,7 +380,7 @@ Schema:
       }
       if (status === 401 || status === 403) {
         throw new SynthesisError(
-          'Google API permission denied (HTTP 403). The API key or Google Cloud project may be restricted, or the Generative Language API is not enabled.',
+          'Google denied access (HTTP 403). The API key may be invalid or restricted, or the Gemini API may not be enabled for it. Check the key in Settings.',
           status
         );
       }

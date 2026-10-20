@@ -7,6 +7,7 @@ import { PostmortemView } from './components/PostmortemView';
 import { LoadingPulse } from './components/LoadingPulse';
 import { DEMO_PRESETS } from './data/demoIncident';
 import { validateInputLogs } from './services/validator';
+import { shouldClearResult } from './services/staleResult';
 import {
   getBlockingReason,
   getStoredAISettings,
@@ -29,12 +30,31 @@ export const App: React.FC = () => {
   const [activeMode, setActiveMode] = useState<'offline_verified' | 'live_ai'>('offline_verified');
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [activeResultModel, setActiveResultModel] = useState<string | null>(null);
+  const [analyzedLog, setAnalyzedLog] = useState<string | null>(null);
+
+  const clearCurrentResult = () => {
+    setIncident(null);
+    setVerification(null);
+    setActiveResultModel(null);
+    setSelectedEventId(null);
+    setHighlightedLineIndices([]);
+    setViewMode('timeline');
+    setStatus('idle');
+    setActiveMode('offline_verified');
+    setAnalyzedLog(null);
+  };
 
   const handleRawLogChange = (newVal: string) => {
     setRawLog(newVal);
     if (warningMessage) {
       setWarningMessage(null);
     }
+
+    const hasCurrentResultOrHighlight = incident !== null || highlightedLineIndices.length > 0;
+    if (hasCurrentResultOrHighlight && shouldClearResult(analyzedLog, newVal)) {
+      clearCurrentResult();
+    }
+
     // Check if typed log matches any preset
     const matchingPreset = DEMO_PRESETS.find(p => p.rawLog.trim() === newVal.trim());
     setActivePresetId(matchingPreset ? matchingPreset.id : null);
@@ -46,14 +66,8 @@ export const App: React.FC = () => {
     setActivePresetId(preset.id);
     setRawLog(preset.rawLog);
     // Explicitly reset right pane to idle (do not trigger synthesis)
-    setIncident(null);
-    setVerification(null);
-    setActiveResultModel(null);
-    setStatus('idle');
+    clearCurrentResult();
     setWarningMessage(null);
-    setSelectedEventId(null);
-    setHighlightedLineIndices([]);
-    setViewMode('timeline');
   };
 
   // Legacy demo loader fallback
@@ -80,6 +94,7 @@ export const App: React.FC = () => {
       setActiveMode(result.mode);
       setActiveResultModel(result.model);
       setStatus('success');
+      setAnalyzedLog(targetText);
 
       // Auto-select false lead or root cause to showcase kernel immediately
       const falseLeadEvent = result.incident.events.find((e) => e.type === 'FALSE_LEAD');
@@ -88,10 +103,7 @@ export const App: React.FC = () => {
         setHighlightedLineIndices(falseLeadEvent.sourceLineIndices || []);
       }
     } catch (err: unknown) {
-      setStatus('idle');
-      setIncident(null);
-      setVerification(null);
-      setActiveResultModel(null);
+      clearCurrentResult();
       if (err instanceof SynthesisError) {
         setWarningMessage(err.message);
       } else {
@@ -105,12 +117,18 @@ export const App: React.FC = () => {
   const handleSynthesize = () => {
     const validation = validateInputLogs(rawLog);
     if (!validation.isValid) {
+      if (incident !== null || highlightedLineIndices.length > 0) {
+        clearCurrentResult();
+      }
       setWarningMessage(validation.error || 'Invalid input logs.');
       return;
     }
 
     const blockingReason = getBlockingReason(rawLog, getStoredAISettings());
     if (blockingReason) {
+      if (incident !== null || highlightedLineIndices.length > 0) {
+        clearCurrentResult();
+      }
       setWarningMessage(blockingReason);
       return;
     }
@@ -120,14 +138,8 @@ export const App: React.FC = () => {
 
   const handleClear = () => {
     setRawLog('');
-    setIncident(null);
-    setVerification(null);
-    setActiveResultModel(null);
-    setStatus('idle');
+    clearCurrentResult();
     setWarningMessage(null);
-    setSelectedEventId(null);
-    setHighlightedLineIndices([]);
-    setViewMode('timeline');
     setActivePresetId(null);
   };
 
@@ -152,6 +164,7 @@ export const App: React.FC = () => {
         activePresetId={activePresetId}
         activeMode={activeMode}
         activeResultModel={activeResultModel}
+        hasActiveResult={incident !== null}
       />
 
       {/* One-Line Plain-English Intro (visible until results are on screen) */}
