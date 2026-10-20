@@ -271,7 +271,7 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
               <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] leading-relaxed flex items-start space-x-2">
                 <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <span>
-                  Free-tier Gemini requests may be used by Google to improve its products. Don't paste confidential logs.
+                  Free-tier Gemini API requests may be used by Google to improve its products. Do not paste confidential, proprietary, or sensitive customer logs.
                 </span>
               </div>
 
