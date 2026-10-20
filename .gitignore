@@ -5,6 +5,7 @@ dist/
 
 # Personal learning profile
 /devpost/learner-profile.md
+devpost/learner-profile.md
 
 # Credentials & environment files
 .env
@@ -16,4 +17,3 @@ dist/
 .claude/
 agent/
 skills-lock.json
-

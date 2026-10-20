@@ -16,7 +16,7 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
    - *Phase 2:* "Isolating root cause and identifying false lead detours..."
    - *Phase 3:* "Assembling chronological timeline & SRE postmortem..."
 4. **Interactive Timeline Inspection:** The right pane transitions smoothly into the synthesized **Timeline View**:
-   - **Triage Efficiency Bar:** A top summary bar visualizing the ratio between *Triage & Red Herrings* (e.g., 35% of outage) and *Actual Remediation*.
+   - **Triage Efficiency Bar:** A top summary bar visualizing the ratio between *Lost on wrong turns* (e.g., 35% of outage) and *Rest of the incident*.
    - **Chronological Node Cards:** High-density milestone cards with normalized timestamps (UTC), author tags, and severity badges (`[Critical Alert]`, `[Mitigation Attempt]`, `[Incident Resolved]`).
    - **False Lead / Rabbit Hole Callouts:** Rendered with amber warning badges, dotted connector lines, and explicit callouts (*"Investigated: Redis cache saturation. Disproven at 14:22 UTC. Time lost: 18 mins"*).
    - **Root Cause Milestone:** Rendered with a prominent crimson/violet halo badge (`[Root Cause Isolated]`) with author attribution and discovery details.
@@ -57,7 +57,7 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 ### 2. Timeline Synthesis & Rabbit Hole Detection
 - As an incident commander, I want to clearly distinguish false leads from the true root cause so that the postmortem reveals where engineering time was lost.
   - [ ] Normalizes mixed timestamp formats into consistent chronological order.
-  - [ ] Computes and renders the top "Time Spent" triage efficiency bar showing triage/red herring duration vs. remediation duration.
+  - [ ] Computes and renders the top "Time Spent" triage efficiency bar showing duration lost on wrong turns vs. the rest of the incident.
   - [ ] Classifies events into typed nodes: Critical Alert, Triage / Investigation, False Lead, Root Cause, Mitigation, and Resolution.
   - [ ] Flags false leads with amber badges, dotted connector styling, and calculated "Time lost" duration.
   - [ ] Highlights the root cause node with a distinctive crimson/violet halo.
@@ -76,13 +76,15 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 - As an SRE or evaluator testing IncidentLens, I want guaranteed truth in advertising and strict verification so that custom logs are never given fabricated output and every milestone is genuinely traced to source lines.
   - [ ] **Sample Mode Boundary:** When no API key is provided, the app operates strictly in "Sample mode" and analyzes ONLY the built-in sample incidents. Pasting any unrecognized/custom log displays an inline amber warning banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add a Gemini API key in Settings (gear icon)."* Synthesis is blocked immediately—no timeline is generated and no loading card is shown.
   - [ ] **Removal of Synthetic Generator:** The generic offline synthesizer that invented arbitrary events for custom logs is permanently removed (superseding the earlier "Deterministic Offline Fallback" decision).
-  - [ ] **Explicit API Error Surfaces (Google Gemini):** Live analysis uses Google Gemini REST API (`generateContent` with a free-tier key from Google AI Studio; OpenAI support is removed). Invalid key (400/403), quota exhaustion (429), model-not-found (404), network/CORS errors, and blocked/empty responses each display a specific, informative error message and never produce a timeline or silently fall back to canned data.
+  - [ ] **Explicit API Error Surfaces (Google Gemini):** Live analysis uses Google Gemini REST API (`generateContent` with a free-tier key from Google AI Studio). Invalid key (400/403), quota exhaustion (429), model-not-found (404), network/CORS errors, and blocked/empty responses each display a specific, informative error message and never produce a timeline or silently fall back to canned data.
   - [ ] **Settings Modal Privacy Disclaimer:** The settings modal warns that free-tier Gemini API requests may be used by Google to improve its products, advising users not to paste confidential or proprietary logs.
   - [ ] **Numbered Line Prompting & Verification Engine:** The live AI prompt numbers each log line and instructs the model to cite exact line numbers for each event. A verification step verifies every milestone: cited line numbers must exist in the raw log, and the milestone timestamp must match a cited line within 1 minute.
-  - [ ] **Deterministic Metric Calculation:** Time lost for false leads and overall triage efficiency ratios are calculated directly from verified milestone timestamps, rather than taken blindly from model text.
-  - [ ] **Grounded Traceability Badge:** The UI displays a live verification badge: `N/M milestones traced to log lines` computed by the verify step. The old generic `[Audit Ready]` wording is retired.
-  - [ ] **Engine Badge Accuracy & UI Cleanup:** Engine badge explicitly shows one of three states: *"Sample mode"*, *"Live AI ready"*, or *"Live AI"*. The obsolete `"v0.1.0-poc"` tag is removed. Configuration is streamlined strictly to Gemini.
-  - [ ] **Left-Aligned Inspect View:** RawLogEditor inspect view enforces `text-left` alignment (retiring `text-justify`) for clean monospace log scanning.
+  - [ ] **Deterministic Metric Calculation & Detour Math:** Time lost for false leads is calculated from the earliest to latest timestamp among cited lines with timestamps, and TTR is recomputed from first to resolution milestone. Overall triage efficiency ratio is calculated deterministically.
+  - [ ] **Live Postmortem Metric Stripping & Owner Sanitization:** Unverified model-written duration/TTD/TTR/ratio lines are stripped and replaced with an authoritative "Key metrics (computed from log timestamps)" block. Action item owners not present in the log become "unassigned".
+  - [ ] **Estimated Live TTD Chip:** Live TTD is displayed as an estimate (`~Xm`) with an informative tooltip.
+  - [ ] **Grounded Traceability Badge:** The UI displays a live verification badge: `N/M milestones traced to log lines` computed by the verify step.
+  - [ ] **Engine Badge Accuracy & UI Cleanup:** Engine badge explicitly shows one of three states: *"Sample mode"*, *"Live AI ready"*, or *"Live AI"*. Configuration is streamlined strictly to Gemini.
+  - [ ] **Left-Aligned Inspect View:** RawLogEditor inspect view enforces `text-left` alignment for clean monospace log scanning.
   - [ ] **Plain-English Intro Banner:** A one-line plain-English explainer sits above the two panes until an incident synthesis result is actively displayed on screen.
 
 ## States and Boundaries
@@ -111,6 +113,9 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 - **Context:** The project has no OpenAI API credits, making it impossible for the author to test and verify the live analysis pathway.
 - **Decision:** Switch live dynamic analysis to Google Gemini (REST `generateContent` with free-tier keys from Google AI Studio). OpenAI support is removed entirely rather than kept alongside. Update sample-mode guidance and settings to refer to Gemini API keys, and add a clear privacy warning in settings that Google AI Studio free-tier requests may be used by Google to improve its products.
 - **Risk Note & 2-Hour Timebox:** If live Gemini calls cannot be made to work directly from the browser within a 2-hour timebox (due to CORS, endpoint, or environment limitations), the project will ship strictly in sample-only mode and state so honestly in the README and hackathon submission.
+
+### Oct 20, 2026 — Honest Efficiency Bar Labels
+- **Decision:** Rename efficiency bar segments from "Triage & Red Herrings" / "Active Remediation" to "Lost on wrong turns" / "Rest of the incident", because the first segment measures strictly time spent on FALSE_LEAD detours while the second encompasses all other incident time (including detection, triage, and root cause diagnosis, not solely remediation).
 
 ## What We're Building
 - Single-page React/Vite/Tailwind dashboard with two-pane layout.

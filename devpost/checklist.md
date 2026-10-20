@@ -50,7 +50,7 @@ Build mode: fast
   Commit: `Add SRE postmortem markdown preview and one-click clipboard export`
 
 - [x] **5. Configurable LLM API engine & graceful offline fallback**
-  Becomes usable: Optional settings drawer in `TopNavbar` to enter an OpenAI or Gemini API key (stored in `localStorage`) for live dynamic log synthesis, while preserving automatic fallback to offline demo data when offline or without a key.
+  Becomes usable: Optional settings drawer in `TopNavbar` to enter a Gemini API key (stored in `localStorage`) for live dynamic log synthesis, while preserving automatic fallback to offline demo data when offline or without a key.
   Why now: Proves real live AI extraction while keeping the application 100% resilient for demo recording and offline evaluation.
   PRD ref: `prd.md > States and Boundaries > API Failure / Fallback State`
   Spec ref: `spec.md > External Services and Dependencies`, `spec.md > services/synthesisService.ts`
@@ -59,21 +59,21 @@ Build mode: fast
   Learner check: Open settings, check the API key drawer and offline badge status, test synthesizing custom logs.
   Commit: `Add configurable live LLM synthesis with seamless offline fallback`
 
-- [ ] **6. Honest analysis and verification**
+- [x] **6. Honest analysis and verification**
   Becomes usable: The system guarantees honest boundaries and verified grounding: Sample mode strictly analyzes only the 2 built-in sample incidents (with clear inline guidance for custom logs); live AI prompts for line numbers and verifies line existence + timestamp matching; UI displays a computed "N/M milestones traced to log lines" badge; and failed API calls surface specific diagnostics without silent canned data substitution.
   Why now: SRE trust requirement—reviewers and evaluators must be confident that milestones are rigorously grounded in the raw log and not hallucinated or quietly mocked.
   PRD ref: `prd.md > Features and Behavior > 5. Honest Analysis & Verifiable Traceability (Slice 6)`, `prd.md > Decision Log`
   Spec ref: `spec.md > Slice 6: Honest Analysis and Verification`, `spec.md > Decisions and Open Issues`
   Build:
-    - [ ] Sample mode boundary: When no API key is present, analyze ONLY the 2 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add a Gemini API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
-    - [ ] Remove the generic offline synthesizer that invents events for arbitrary logs (superseding "Deterministic Offline Fallback").
-    - [ ] Surface specific error diagnostics for live Gemini API failures (invalid key, 429 quota exhaustion, 404 model-not-found, network/CORS, blocked/empty response, invalid JSON) with zero silent fallback to canned data.
-    - [ ] Live prompt numbers log lines and instructs the model to cite line numbers; add verify step checking that cited lines exist and milestone timestamp matches a cited line within 1 minute; compute false lead time lost and triage ratio deterministically from timestamps.
-    - [ ] Update UI to display `"N/M milestones traced to log lines"` computed by verify step, retiring the old `[Audit Ready]` wording.
-    - [ ] Update engine badge states: `"Sample mode"`, `"Live AI ready"`, `"Live AI"`; streamline settings exclusively to Gemini (remove OpenAI); add free-tier privacy warning to settings modal; remove `"v0.1.0-poc"` chip.
-    - [ ] Update RawLogEditor inspect view to use `text-left` instead of `text-justify`.
-    - [ ] Add a one-line plain-English intro banner above the two panes until an incident result is on screen.
-    - [ ] Run one unseen log through live mode and confirm milestones highlight correct lines
+    - [x] Sample mode boundary: When no API key is present, analyze ONLY the 2 built-in incidents. Any other pasted log shows an inline amber banner: *"Sample mode only analyzes the 2 built-in incidents. To analyze your own log, add a Gemini API key in Settings (gear icon)."* No timeline is generated and no loading card is shown.
+    - [x] Remove the generic offline synthesizer that invents events for arbitrary logs (superseding "Deterministic Offline Fallback").
+    - [x] Surface specific error diagnostics for live Gemini API failures (invalid key, 429 quota exhaustion, 404 model-not-found, network/CORS, blocked/empty response, invalid JSON) with zero silent fallback to canned data.
+    - [x] Live prompt numbers log lines and instructs the model to cite line numbers; add verify step checking that cited lines exist and milestone timestamp matches a cited line within 1 minute; measure false-lead detour window from earliest to latest cited line with timestamps; recompute TTR from timestamps; strip model-written duration/TTD/TTR/ratio lines and insert computed key metrics block; sanitize action item owners against log handles; display live TTD chip as estimate (~Xm).
+    - [x] Update UI to display `"N/M milestones traced to log lines"` computed by verify step.
+    - [x] Update engine badge states: `"Sample mode"`, `"Live AI ready"`, `"Live AI"`; streamline settings exclusively to Gemini; add free-tier privacy warning to settings modal.
+    - [x] Update RawLogEditor inspect view to use `text-left`.
+    - [x] Add a one-line plain-English intro banner above the two panes until an incident result is on screen.
+    - [x] Run one unseen log through live mode and confirm milestones highlight correct lines
   Verify (mechanical): Run `npm run build` with zero errors; test custom log in Sample mode to verify amber banner blocks synthesis; test live Gemini API error surfacing without silent fallback; verify line citation and timestamp matching logic; confirm badge reads "N/M milestones traced to log lines" and inspect view is text-left.
   Learner check: Paste a custom log in Sample mode, observe amber banner; switch to a preset and verify "N/M milestones traced to log lines"; check engine badge states; verify live Gemini synthesis with free-tier key.
   Commit: `feat: implement honest analysis, verification step, and sample mode boundaries (Slice 6)`
@@ -104,7 +104,7 @@ Activity mode: live app and editor with interactive `devpost/app-map.html` compa
 - Synchronized textarea vertical scroll with line-number gutter (`RawLogEditor.tsx`) using locked `leading-6` heights to eliminate visual misalignment when scrolling.
 - Extended 3-stage progress pulse pacing to 800ms per phase (total 2.4s) in `LoadingPulse.tsx` and `App.tsx` so synthesis phases are readable during video demonstration.
 - Fixed top-left source trace badge orb clipping by removing outer `overflow-hidden`, padding to `px-3 py-1.5`, and applying `relative flex h-2 w-2 shrink-0 mr-2` to prevent half-moon crop.
-- Enforced whole-word typography wrapping (`whitespace-pre-wrap break-words text-justify`) across inspect code blocks and log outputs.
+- Enforced whole-word typography wrapping (`whitespace-pre-wrap break-words text-left`) across inspect code blocks and log outputs.
 - Implemented Multi-Scenario Preset Selector with 2 realistic presets: "Flash Sale 504s" (Connection pool exhaustion; Redis detour) and "Database Deadlock" (Exclusive table lock; DDoS false alarm).
 - Added Timeline Milestone Filter Bar (`[All Milestones]`, `[Root Cause & Alerts Only]`, `[False Leads Only]`) dynamically isolating matching events.
 - Added One-Click Jira/GitHub Task Export formatting remediation action items into clean markdown task checklists with priority tags.
@@ -120,6 +120,3 @@ Activity mode: live app and editor with interactive `devpost/app-map.html` compa
 - **Context:** The project has zero OpenAI API credits, making it impossible for the author to test and demonstrate live dynamic incident synthesis.
 - **Decision:** Switch live analysis provider exclusively to Google Gemini (REST `generateContent` via Google AI Studio free tier). OpenAI support is removed, not kept alongside. Sample-mode guidance and settings modal are updated to refer to Gemini API keys, with an explicit privacy disclaimer regarding free-tier data logging.
 - **Risk Note & 2-Hour Timebox:** If live Gemini calls cannot be made to work directly from the browser within a 2-hour timebox, the project will ship in sample-only mode and say so honestly in the README and submission.
-
-
-

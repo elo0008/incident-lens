@@ -33,7 +33,7 @@ PRD ref: `prd.md > The Core Journey`, `prd.md > Look and Feel`.
 - **Styling:** [Tailwind CSS](https://tailwindcss.com/) (`^3.4`) + [@tailwindcss/typography](https://tailwindcss.com/docs/typography-plugin). *Rationale:* Clean utility classes for high-density slate-950 dark mode, custom scrollbars, and markdown rendering.
 - **Iconography:** [lucide-react](https://lucide.dev/) (`^0.475`). *Rationale:* Crisp, modern developer tool icons (AlertTriangle, Check, Copy, Terminal, Clock, RefreshCw, Cpu, Layers).
 - **Markdown Previewer:** [react-markdown](https://github.com/remarkjs/react-markdown) + [remark-gfm](https://github.com/remarkjs/remark-gfm). *Rationale:* Standard GitHub-flavored markdown parsing (tables, task lists, code blocks) in pure React.
-- **AI / LLM Integration:** Client-side fetch using Google Gemini REST API (`https://generativelanguage.googleapis.com/v1beta/models/...:generateContent`) with `responseMimeType: "application/json"`. OpenAI support removed. *Rationale:* Free tier available via Google AI Studio without upfront credits, enabling live testing by the author.
+- **AI / LLM Integration:** Client-side fetch using Google Gemini REST API (`https://generativelanguage.googleapis.com/v1beta/models/...:generateContent`) with `responseMimeType: "application/json"`. *Rationale:* Free tier available via Google AI Studio without upfront credits, enabling live testing by the author.
 - **Offline Fallback Engine:** Built-in TypeScript module (`src/data/demoIncident.ts`). *Rationale:* Guarantees zero latency and 100% demo resilience.
 
 ## Where It Runs and How Someone Tries It
@@ -81,7 +81,7 @@ Rendered during `loading` state. Displays the 3-stage animated progress sequence
 PRD ref: `prd.md > States and Boundaries > Loading / In-Flight State`.
 
 ### TriageEfficiencyBar (`src/components/TriageEfficiencyBar.tsx`)
-Rendered at the top of the right pane in `success` state. Displays metrics: TTD (Time to Detect), TTR (Time to Resolve), and an interactive stacked visual progress bar dividing *Triage / Red Herrings* from *Active Remediation*.
+Rendered at the top of the right pane in `success` state. Displays metrics: TTD (Time to Detect), TTR (Time to Resolve), and an interactive stacked visual progress bar dividing *Lost on wrong turns* from *Rest of the incident*.
 PRD ref: `prd.md > Features and Behavior > 2. Timeline Synthesis & Rabbit Hole Detection`.
 
 ### TimelineView (`src/components/TimelineView.tsx`)
@@ -188,11 +188,11 @@ incident-lens/
 
 ## External Services and Dependencies
 - **Google Gemini Endpoint (Optional for Custom Logs):**
-  - Endpoint: Google AI Studio REST `generateContent` (`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={apiKey}`)
-  - Model: `gemini-1.5-flash`
-  - Payload: Numbered raw incident text (`[L1] ...`) with system prompt and JSON schema instructions requesting explicit line citations for every milestone.
+  - Endpoint: Google AI Studio REST `generateContent` (`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent`)
+  - Primary Model: `gemini-3.6-flash` (with transient retry on 500/503/504 and fallback to `gemini-3.5-flash`)
+  - Payload: Numbered raw incident text (`1| text`) with system prompt and JSON schema instructions requesting explicit line citations for every milestone.
   - Response format: Strict JSON object enforced via `generationConfig.responseMimeType = "application/json"`.
-  - Authentication: Free-tier API key from Google AI Studio. OpenAI support is completely removed.
+  - Authentication: Free-tier API key from Google AI Studio, stored exclusively in browser localStorage.
 
 ## Slice 6: Honest Analysis and Verification
 
@@ -218,31 +218,38 @@ incident-lens/
 - A failed live call never produces a timeline and never silently falls back to canned or invented data.
 
 ### 4. Line Numbered Prompting & Verification Engine
-- **Prompt Enhancement:** Before sending the raw log to Gemini, lines are indexed and prepended with explicit line tags (`[L1]`, `[L2]`, ...). The prompt directs the model to cite the exact line numbers (e.g. `citedLines: [14, 15]`) for every extracted event.
-- **Verification Engine (`verifyMilestones`):**
+- **Prompt Enhancement:** Before sending the raw log to Gemini, lines are indexed and prepended with explicit line numbers (`N| text`). The prompt directs the model to cite the exact line numbers (e.g. `sourceLineNumbers: [14, 15]`) for every extracted event.
+- **Verification Engine (`verifyIncident` in `src/services/verify.ts`):**
   - Iterates over each event produced by the model.
-  - Verifies that every cited line exists in the original log.
+  - Drops out-of-range line references and records warnings.
   - Verifies that the milestone's timestamp matches the timestamp on at least one cited line within a 1-minute tolerance window.
-  - Derives `timeLostMinutes` for false leads and the overall `triageTimeRatio` deterministically from milestone timestamp math, rather than relying on model text generation.
+  - **Detour Span Calculation:** For each `FALSE_LEAD` event, extracts all cited lines with valid timestamps (`HH:MM` or `HH:MM:SS`), unwraps them across midnight in chronological line order, and computes `timeLostMinutes = Math.round((end - start) / 60)`. If fewer than two cited lines contain timestamps or `end <= start`, the model's estimate is kept with an explicit warning indicating unverified duration.
+  - **TTR Recomputation:** Recomputes `ttrMinutes` from the first event timestamp to the resolution event timestamp.
+  - Derives overall `triageTimeRatio` deterministically: $\frac{\sum \text{false-lead minutes}}{\text{ttrMinutes}}$.
 
-### 5. Verifiable Grounding Badge
-- The top header of `PostmortemView` replaces the static `[Audit Ready]` badge with a computed grounding badge:
+### 5. Live Postmortem Markdown Formatting & Action Item Sanitization
+- In `synthesisService.ts`, unverified model arithmetic is stripped: any lines matching `/Duration|Time to Detect|Time to Resolve|TTD|TTR|Triage Time Ratio|Triage Efficiency/` are removed.
+- An authoritative `Key metrics (computed from log timestamps)` block is inserted directly under the document heading containing verified duration, TTR, minutes lost on wrong turns, and share percentage.
+- Action item owners are checked against handles/names in the raw log (`resolveActionItemOwner`). If the owner does not appear in the log, it is sanitized to `"unassigned"`.
+- Live Time to Detect (TTD) chip in `TriageEfficiencyBar` displays with a tilde (`~Xm`) and tooltip indicating it is an AI estimate from the log, not computed from timestamps.
+
+### 6. Verifiable Grounding Badge
+- The top header displays a computed grounding badge:
   `"N/M milestones traced to log lines"` (e.g. `7/7 milestones traced to log lines`).
 
-### 6. Engine Badge & UI Cleanup
+### 7. Engine Badge & UI Cleanup
 - Top navbar engine status displays one of three explicit states:
   1. `"Sample mode"` (no API key configured)
   2. `"Live AI ready"` (valid API key stored in settings)
   3. `"Live AI"` (synthesis produced via live model response)
-- Settings modal configuration is streamlined strictly to Google Gemini (free-tier key; OpenAI is removed).
+- Settings modal configuration is streamlined strictly to Google Gemini (free-tier key).
 - The settings modal includes an explicit data privacy notice:
   *"Notice: Google AI Studio free-tier requests may be logged and used by Google to improve products. Do not paste confidential or proprietary logs."*
-- The obsolete `"v0.1.0-poc"` chip in the header is removed.
 
-### 7. Left-Aligned Inspect View Typography
-- In `RawLogEditor`, lines rendered in Inspect View use `text-left` alignment (retiring `text-justify`) to maintain natural monospace readability for logs.
+### 8. Left-Aligned Inspect View Typography
+- In `RawLogEditor`, lines rendered in Inspect View use `text-left` alignment to maintain natural monospace readability for logs.
 
-### 8. Plain-English Intro Header
+### 9. Plain-English Intro Header
 - A concise, one-line plain-English explainer banner sits prominently above the two panes whenever no synthesized result is on screen:
   *"Paste raw incident chat & alerts or select a built-in sample to synthesize a verifiable SRE timeline and postmortem."*
 
@@ -255,14 +262,14 @@ incident-lens/
 
 ## What Was Simplified and Why
 - **Sample Mode for Built-In Incidents Only:** Keeps the app 100% dependable for demo evaluations without risking fabricated inferences for unverified user logs.
-- **Direct Google Gemini Integration:** Uses Google AI Studio free tier so live analysis can be tested without paid credits. OpenAI integration is removed.
+- **Direct Google Gemini Integration:** Uses Google AI Studio free tier so live analysis can be tested without paid credits.
 - **Client-Side Verification Step:** Guarantees auditability mathematically before presenting data to the user.
 - **Risk Note & 2-Hour Timebox:** If browser-direct calls to the Gemini API cannot be made to work within a 2-hour timebox (due to CORS, endpoint, or environment limitations), the project will ship strictly in sample-only mode and state so transparently in the README and Devpost submission.
 
 ## Decisions and Open Issues
 
 ### Decision Log — Oct 19, 2026: Honest Analysis and Source Grounding Verification
-- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an OpenAI API key, or with an invalid key.
+- **Context:** Reviewers and hackathon judges may paste their own raw incident logs into the editor without entering an API key, or with an invalid key.
 - **Decision:** Remove the generic offline synthesizer that invented arbitrary events for custom logs, and restrict Sample mode strictly to the built-in sample incidents. Require an API key for custom logs, explicitly surface API errors without silent fallback, and deterministically verify all cited line numbers and timestamps.
 - **Reasoning:** Fabricating synthetic events for arbitrary logs directly contradicts IncidentLens's core promise—that every single milestone is rigorously grounded in and auditable against the source log. Grounding verification and truthful error boundaries build authentic engineering trust.
 
@@ -278,5 +285,13 @@ incident-lens/
 - **Context:** The project has zero OpenAI API credits, making it impossible for the author to test and demonstrate live dynamic incident synthesis.
 - **Decision:** Switch live analysis provider exclusively to Google Gemini (REST `generateContent` via Google AI Studio free tier). OpenAI support is removed, not kept alongside. Sample-mode guidance and settings modal are updated to refer to Gemini API keys, with an explicit privacy disclaimer regarding free-tier data logging.
 - **Risk Note & 2-Hour Timebox:** If live Gemini calls cannot be made to work directly from the browser within a 2-hour timebox, the project will ship in sample-only mode and say so honestly in the README and submission.
+
+### Decision Log — Oct 20, 2026: Postmortem Toolbar Polish & Grounding Badge De-duplication
+- **Decision:** Grounding badge lives only in the app header; PostmortemView toolbar no longer repeats it.
+
+### Decision Log — Oct 20, 2026: Honest Efficiency Bar Labels
+- **Decision:** Rename efficiency bar segments from "Triage & Red Herrings" / "Active Remediation" to "Lost on wrong turns" / "Rest of the incident", because the first segment measures strictly time spent on FALSE_LEAD detours while the second encompasses all other incident time (including detection, triage, and root cause diagnosis, not solely remediation).
+
+
 
 
