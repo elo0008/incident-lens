@@ -8,7 +8,7 @@ interface LoadingPulseProps {
 const STAGES = [
   {
     id: 1,
-    title: 'Extracting messages and normalizing timestamps...',
+    title: 'Building the timeline',
     detail: 'Parsing channel logs, bot alerts, and mapping UTC timeline anchors',
     icon: Clock,
     color: 'text-cyan-400',
@@ -17,7 +17,7 @@ const STAGES = [
   },
   {
     id: 2,
-    title: 'Isolating root cause and identifying false lead detours...',
+    title: 'Measuring the wrong turns',
     detail: 'Detecting red herring rabbit holes, calculating minutes lost, and pinpointing culprit',
     icon: GitBranch,
     color: 'text-amber-400',
@@ -26,7 +26,7 @@ const STAGES = [
   },
   {
     id: 3,
-    title: 'Assembling chronological timeline & SRE postmortem...',
+    title: 'Checking against the log',
     detail: 'Synthesizing triage ratio bar, milestone cards, and audit-ready markdown',
     icon: Layers,
     color: 'text-emerald-400',

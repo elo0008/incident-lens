@@ -30,7 +30,7 @@ Build mode: fast
   Commit: `Add cross-pane node-to-source log line highlighting`
 
 - [x] **3. Input validation, 3-stage progress pulse & error handling**
-  Becomes usable: Client-side regex pre-validation catches invalid or timestampless input with an inline warning banner; clicking synthesize activates an animated 3-stage progress pulse (*"Extracting messages..."* → *"Isolating root cause..."* → *"Assembling timeline..."*).
+  Becomes usable: Client-side regex pre-validation catches invalid or timestampless input with an inline warning banner; clicking synthesize activates an animated 3-stage progress pulse (*"Building the timeline"* → *"Measuring the wrong turns"* → *"Checking against the log"*).
   Why now: Robustness and UX polish—prevents broken requests or confused user states and creates an engaging operational feel during synthesis.
   PRD ref: `prd.md > Features and Behavior > 1. Raw Log Ingestion & Validation`, `prd.md > States and Boundaries > Loading / In-Flight State`, `Input Error State`
   Spec ref: `spec.md > Components > LoadingPulse, RawLogEditor`, `spec.md > services/validator.ts`

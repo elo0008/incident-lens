@@ -12,9 +12,9 @@ Source: `scope.md > The Core Loop`, `scope.md > The Unique Kernel`.
 1. **Arrival & Initial State:** The user lands on a two-pane dashboard in a high-density, charcoal/slate dark theme. The left pane contains an empty text editor with placeholder instructions and a prominent **"Load Demo Incident"** action button. The right pane displays a subtle dashed-line timeline blueprint with a call-to-action to paste logs or load the demo.
 2. **Input / Sample Loading:** The user clicks **"Load Demo Incident"**, which pre-populates the left pane with the realistic "Payment Gateway 504 Spikes during Flash Sale" scenario (40+ lines of Datadog alerts, engineer triage chatter, a 20-minute detour chasing Redis memory saturation, and eventual isolation of third-party webhook connection pool exhaustion). Alternatively, the user pastes their own raw incident logs.
 3. **Execution & In-Flight State:** The user clicks **"Synthesize Timeline"**. The button enters a loading state with an active spinner, and the right pane displays an animated 3-stage progress pulse:
-   - *Phase 1:* "Extracting messages and normalizing timestamps..."
-   - *Phase 2:* "Isolating root cause and identifying false lead detours..."
-   - *Phase 3:* "Assembling chronological timeline & SRE postmortem..."
+   - *Phase 1:* "Building the timeline"
+   - *Phase 2:* "Measuring the wrong turns"
+   - *Phase 3:* "Checking against the log"
 4. **Interactive Timeline Inspection:** The right pane transitions smoothly into the synthesized **Timeline View**:
    - **Triage Efficiency Bar:** A top summary bar visualizing the ratio between *Lost on wrong turns* (e.g., 35% of outage) and *Rest of the incident*.
    - **Chronological Node Cards:** High-density milestone cards with normalized timestamps (UTC), author tags, and severity badges (`[Critical Alert]`, `[Mitigation Attempt]`, `[Incident Resolved]`).
